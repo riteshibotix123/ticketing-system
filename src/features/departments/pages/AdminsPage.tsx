@@ -16,7 +16,7 @@ import { AddAdminDialog } from '../components/AddAdminDialog';
 import { AdminList } from '../components/AdminList';
 
 /**
- * /config/admins (spec 9.13 + rule 14): Super Admin only — the router guards
+ * /config/admins (spec 9.13 + rule 14): Super Admin only ï¿½ the router guards
  * the route with admins.manage. Add, deactivate, activate, remove admins and
  * the "Admins can manage departments" toggle.
  */
@@ -91,7 +91,7 @@ export default function AdminsPage() {
         <SkeletonTable rows={4} columns={4} />
       ) : adminsQuery.isError ? (
         <ErrorState message={errorMessage(adminsQuery.error)} onRetry={adminsQuery.refetch} />
-      ) : adminsQuery.data.items.length === 0 ? (
+      ) : adminsQuery.data.length === 0 ? (
         <EmptyState
           title="No admin accounts yet."
           description="Add the first Admin to help govern tickets and departments."
@@ -103,7 +103,7 @@ export default function AdminsPage() {
           }
         />
       ) : (
-        <AdminList admins={adminsQuery.data.items} />
+        <AdminList admins={adminsQuery.data} />
       )}
 
       <AddAdminDialog open={addOpen} onOpenChange={setAddOpen} />

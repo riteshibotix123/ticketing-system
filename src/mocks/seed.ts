@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Seed data (spec section 14).
  * Password for EVERY seeded user: `IbotixDemo@2026` (see auth.DEMO_PASSWORD).
  * Emails follow firstname.lastname@ibotix.ai.
@@ -7,7 +7,7 @@
  * demonstrate the "No active Spoke yet" rule (tickets cannot be raised there;
  * the 422 rule is enforced on department mutations, not on the seed itself).
  */
-import type { Department, SignupRequest, User } from '@/types/domain';
+import type { AccountState, Department, Role, SignupRequest } from '@/types/domain';
 import { clearDatabase, db, findUser, ref, type DbUser } from './db';
 import { buildSeedTickets } from './seedTickets';
 import { addAudit, notifyUsers } from './helpers';
@@ -19,11 +19,10 @@ interface SeedUser {
   id: string;
   name: string;
   title?: string;
-  roles: User['roles'];
+  roles: Role[];
   department_id: string | null;
   spoke_departments?: string[];
-  confidential_departments?: string[];
-  state?: User['state'];
+  state?: AccountState;
   createdH?: number;
 }
 
@@ -48,7 +47,7 @@ const USERS: SeedUser[] = [
     id: 'u-dev',
     name: 'Dev Patel',
     title: 'IT Support Engineer',
-    roles: ['resolver'],
+    roles: ['employee'],
     department_id: 'IT',
     createdH: 700,
   },
@@ -77,7 +76,6 @@ const USERS: SeedUser[] = [
     roles: ['spoke'],
     department_id: 'HR',
     spoke_departments: ['HR'],
-    confidential_departments: ['HR'],
     createdH: 1100,
   },
   {
@@ -105,7 +103,6 @@ const USERS: SeedUser[] = [
     roles: ['spoke'],
     department_id: 'SEC',
     spoke_departments: ['SEC'],
-    confidential_departments: ['SEC'],
     createdH: 980,
   },
   {
@@ -115,7 +112,6 @@ const USERS: SeedUser[] = [
     roles: ['spoke'],
     department_id: 'LGL',
     spoke_departments: ['LGL'],
-    confidential_departments: ['LGL'],
     createdH: 960,
   },
   {
@@ -186,9 +182,9 @@ function seedUsers(): void {
       department_id: su.department_id,
       state: su.state ?? 'active',
       spoke_departments: su.spoke_departments ?? [],
-      confidential_departments: su.confidential_departments ?? [],
       mfa_enabled: mfa,
       created_at: agoIso(su.createdH ?? 500),
+      last_login_at: null,
       password: DEMO_PASSWORD,
     };
     db.users.push(user);
@@ -201,109 +197,68 @@ function seedDepartments(): void {
     if (!user) throw new Error(`Seed error: unknown user ${id}`);
     return ref(user);
   };
-  const departments: Department[] = [
-    {
-      id: 'IT',
-      name: 'IT',
-      spokes: [u('u-rohan'), u('u-isha')],
-      escalation_primary: u('u-rohan'),
-      escalation_backup: u('u-isha'),
+  const categories = (
+    prefix: string,
+    departmentId: string,
+    names: string[],
+  ): Department['categories'] =>
+    names.map((name, index) => ({
+      id: `${prefix}-${index + 1}`,
+      name,
+      department_id: departmentId,
       confidential: false,
       active: true,
-      categories: [
-        { id: 'c-it-1', name: 'Access & Accounts', department_id: 'IT' },
-        { id: 'c-it-2', name: 'Hardware', department_id: 'IT' },
-        { id: 'c-it-3', name: 'Software & Licenses', department_id: 'IT' },
-        { id: 'c-it-4', name: 'Network & VPN', department_id: 'IT' },
-      ],
-    },
-    {
-      id: 'HR',
-      name: 'HR',
-      spokes: [u('u-neha')],
-      escalation_primary: u('u-neha'),
-      escalation_backup: u('u-priya'),
-      confidential: true,
-      active: true,
-      categories: [
-        { id: 'c-hr-1', name: 'Payroll & Benefits', department_id: 'HR' },
-        { id: 'c-hr-2', name: 'Leave & Attendance', department_id: 'HR' },
-        { id: 'c-hr-3', name: 'Workplace Concerns', department_id: 'HR' },
-      ],
-    },
-    {
-      id: 'FIN',
-      name: 'Finance',
-      spokes: [u('u-sanjay')],
-      escalation_primary: u('u-sanjay'),
-      escalation_backup: u('u-priya'),
-      confidential: false,
-      active: true,
-      categories: [
-        { id: 'c-fin-1', name: 'Expenses & Reimbursement', department_id: 'FIN' },
-        { id: 'c-fin-2', name: 'Invoices & Payments', department_id: 'FIN' },
-        { id: 'c-fin-3', name: 'Finance Systems Access', department_id: 'FIN' },
-      ],
-    },
-    {
-      id: 'FAC',
-      name: 'Facilities',
-      spokes: [u('u-tara')],
-      escalation_primary: u('u-tara'),
-      escalation_backup: u('u-priya'),
-      confidential: false,
-      active: true,
-      categories: [
-        { id: 'c-fac-1', name: 'Workspace & Seating', department_id: 'FAC' },
-        { id: 'c-fac-2', name: 'Repairs & Maintenance', department_id: 'FAC' },
-        { id: 'c-fac-3', name: 'Housekeeping', department_id: 'FAC' },
-      ],
-    },
-    {
-      id: 'SEC',
-      name: 'Security',
-      spokes: [u('u-vikram')],
-      escalation_primary: u('u-vikram'),
-      escalation_backup: u('u-karan'),
-      confidential: true,
-      active: true,
-      categories: [
-        { id: 'c-sec-1', name: 'Incident Response', department_id: 'SEC' },
-        { id: 'c-sec-2', name: 'Suspicious Activity', department_id: 'SEC' },
-        { id: 'c-sec-3', name: 'Access Reviews', department_id: 'SEC' },
-      ],
-    },
-    {
-      id: 'LGL',
-      name: 'Legal',
-      spokes: [u('u-aarav')],
-      escalation_primary: u('u-aarav'),
-      escalation_backup: u('u-priya'),
-      confidential: true,
-      active: true,
-      categories: [
-        { id: 'c-lgl-1', name: 'Contracts', department_id: 'LGL' },
-        { id: 'c-lgl-2', name: 'Compliance & Policies', department_id: 'LGL' },
-        { id: 'c-lgl-3', name: 'Data & Privacy', department_id: 'LGL' },
-      ],
-    },
-    {
-      // No active Spoke: the create-ticket form must disable it with
-      // "No active Spoke yet" (spec 9.5 / requirement 15).
-      id: 'ENG',
-      name: 'Engineering',
-      spokes: [],
-      escalation_primary: null,
-      escalation_backup: null,
-      confidential: false,
-      active: true,
-      categories: [
-        { id: 'c-eng-1', name: 'Developer Tooling', department_id: 'ENG' },
-        { id: 'c-eng-2', name: 'Code & Reviews', department_id: 'ENG' },
-      ],
-    },
-  ];
-  db.departments.push(...departments);
+    }));
+  const department = (
+    id: string,
+    name: string,
+    spokes: Department['spokes'],
+    escalation: Department['escalation_contact'],
+    categoryNames: string[],
+  ): Department => ({
+    id,
+    name,
+    active: true,
+    accepts_tickets: spokes.length > 0,
+    spokes,
+    escalation_contact: escalation,
+    categories: categories(`c-${id.toLowerCase()}`, id, categoryNames),
+  });
+
+  db.departments.push(
+    department('IT', 'IT', [u('u-rohan'), u('u-isha')], u('u-rohan'), [
+      'Access & Accounts',
+      'Hardware',
+      'Software & Licenses',
+      'Network & VPN',
+    ]),
+    department('HR', 'HR', [u('u-neha')], u('u-neha'), [
+      'Payroll & Benefits',
+      'Leave & Attendance',
+      'Workplace Concerns',
+    ]),
+    department('FIN', 'Finance', [u('u-sanjay')], u('u-sanjay'), [
+      'Expenses & Reimbursement',
+      'Invoices & Payments',
+      'Finance Systems Access',
+    ]),
+    department('FAC', 'Facilities', [u('u-tara')], u('u-tara'), [
+      'Workspace & Seating',
+      'Repairs & Maintenance',
+      'Housekeeping',
+    ]),
+    department('SEC', 'Security', [u('u-vikram')], u('u-vikram'), [
+      'Incident Response',
+      'Suspicious Activity',
+      'Access Reviews',
+    ]),
+    department('LGL', 'Legal', [u('u-aarav')], u('u-aarav'), [
+      'Contracts',
+      'Compliance & Policies',
+      'Data & Privacy',
+    ]),
+    department('ENG', 'Engineering', [], null, ['Developer Tooling', 'Code & Reviews']),
+  );
 }
 
 function seedSignupRequests(): void {
@@ -315,6 +270,7 @@ function seedSignupRequests(): void {
       requested_role: 'employee',
       requested_department: 'ENG',
       status: 'pending',
+      can_approve: false,
       createdH: 30,
     },
     {
@@ -324,6 +280,7 @@ function seedSignupRequests(): void {
       requested_role: 'admin',
       requested_department: 'HR',
       status: 'pending',
+      can_approve: false,
       createdH: 20,
     },
     {
@@ -333,6 +290,7 @@ function seedSignupRequests(): void {
       requested_role: 'super_admin',
       requested_department: 'IT',
       status: 'pending',
+      can_approve: false,
       createdH: 10,
     },
     // Decided history so the Approvals screen has a list below the pending one.
@@ -342,9 +300,10 @@ function seedSignupRequests(): void {
       email_verified: true,
       requested_role: 'employee',
       requested_department: 'IT',
-      approved_role: 'resolver',
+      approved_role: 'employee',
       approved_department: 'IT',
       status: 'approved',
+      can_approve: false,
       decided_by: ref(findUser('u-priya')!),
       decided_at: agoIso(700),
       createdH: 720,
@@ -361,7 +320,7 @@ function seedSignupRequests(): void {
     const recipients =
       req.requested_role === 'employee' ? ['u-priya', 'u-karan'] : ['u-karan', 'u-aditya'];
     notifyUsers(recipients, {
-      text: `New access request from ${req.name} (${req.requested_role.replace('_', ' ')}) — ${req.requested_department}.`,
+      text: `New access request from ${req.name} (${req.requested_role.replace('_', ' ')}) â€” ${req.requested_department}.`,
       kind: 'signup_request',
       at: req.created_at,
       read: Date.now() - Date.parse(req.created_at) > 12 * 3_600_000,
@@ -377,7 +336,7 @@ function seedStandaloneAudit(): void {
       action: 'user.roles_updated',
       object_type: 'user',
       object_id: 'u-dev',
-      detail: 'Granted Resolver in IT',
+      detail: 'Mapped Dev Patel to the IT directory',
       reason: 'Onboarding the IT support rota',
     },
     {
@@ -431,3 +390,4 @@ export function resetDatabase(): void {
   clearDatabase();
   seedDatabase();
 }
+

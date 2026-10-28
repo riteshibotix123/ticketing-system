@@ -1,14 +1,16 @@
 import { api } from '../client';
 import type {
+  AdminDashboard,
   AuditEntry,
   EmployeeDashboard,
-  AdminDashboard,
-  Paged,
   Notification,
+  Paged,
   SpokeDashboard,
 } from '@/types/domain';
 
 export type DashboardKind = 'admin' | 'spoke' | 'employee';
+
+export type DashboardData = AdminDashboard | SpokeDashboard | EmployeeDashboard;
 
 export interface NotificationListParams {
   unread?: boolean;
@@ -31,12 +33,11 @@ export const notificationsApi = {
   list: (params: NotificationListParams) =>
     api.get<Paged<Notification>>('/notifications', { ...params }),
 
-  unreadCount: () =>
-    api.get<{ count: number }>('/notifications', { unread: true, count_only: true }),
+  unreadCount: () => api.get<{ count: number }>('/notifications/unread-count'),
 
-  markRead: (id: string) => api.post<Notification>(`/notifications/${id}/read`),
+  markRead: (id: string) => api.post<void>(`/notifications/${id}/read`),
 
-  markAllRead: () => api.post<{ updated: number }>('/notifications/read-all'),
+  markAllRead: () => api.post<void>('/notifications/read-all'),
 };
 
 export const auditApi = {
@@ -47,4 +48,9 @@ export const dashboardApi = {
   admin: () => api.get<AdminDashboard>('/dashboard/admin'),
   spoke: () => api.get<SpokeDashboard>('/dashboard/spoke'),
   employee: () => api.get<EmployeeDashboard>('/dashboard/employee'),
+};
+
+export const reportsApi = {
+  export: (type: string, format: string) =>
+    api.blob('/reports/export', { type, format }),
 };

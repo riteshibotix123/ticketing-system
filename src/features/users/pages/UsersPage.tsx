@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/common/DataTable';
@@ -9,7 +9,7 @@ import { usersApi } from '@/api/endpoints/users';
 import { queryKeys } from '@/api/queryKeys';
 import { PAGE_SIZE } from '@/lib/constants';
 import { useUrlFilters } from '@/hooks/useUrlFilters';
-import type { User } from '@/types/domain';
+import type { AccountState, Role, UserListItem } from '@/types/domain';
 import { UserFilters } from '@/features/users/components/UserFilters';
 import { getUserColumns } from '@/features/users/components/userColumns';
 import { RolesDialog } from '@/features/users/components/RolesDialog';
@@ -19,8 +19,8 @@ import { DeactivateDialog } from '@/features/users/components/DeactivateDialog';
 export default function UsersPage() {
   const filters = useUrlFilters();
   const q = filters.get('q');
-  const role = filters.get('role');
-  const state = filters.get('state');
+  const role = filters.get('role') as Role | undefined;
+  const state = filters.get('state') as AccountState | undefined;
   const departmentFilter = filters.get('department_id');
 
   const params = useMemo(
@@ -45,8 +45,8 @@ export default function UsersPage() {
     staleTime: 60_000,
   });
 
-  const [rolesTarget, setRolesTarget] = useState<User | null>(null);
-  const [accountTarget, setAccountTarget] = useState<User | null>(null);
+  const [rolesTarget, setRolesTarget] = useState<UserListItem | null>(null);
+  const [accountTarget, setAccountTarget] = useState<UserListItem | null>(null);
 
   const columns = useMemo(
     () =>
@@ -83,7 +83,7 @@ export default function UsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Search people, assign Spoke and Resolver roles, and activate or deactivate accounts. Every change asks for a reason and is audit logged."
+        description="Search people, manage Spoke departments, and activate or deactivate accounts. Every change asks for a reason and is audit logged."
       />
 
       <UserFilters filters={filters} departments={departmentsQuery.data ?? []} />

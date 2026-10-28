@@ -164,8 +164,9 @@ export const ticketHandlers = [
           category_id: category.id,
           category_name: category.name,
           priority: str(body.priority) as Ticket['priority'],
+          requested_priority: str(body.priority) as Ticket['priority'],
           status: 'new',
-          confidential: body.confidential === true,
+          confidential: category.confidential || body.confidential === true,
           requester: actorRef(user),
           owner: null,
           assignee: null,
@@ -174,12 +175,14 @@ export const ticketHandlers = [
           sla_started_at: new Date(now).toISOString(),
           acknowledged_at: null,
           eta: null,
+          next_checkpoint_at: null,
           last_team_update_at: null,
           resolved_at: null,
           closed_at: null,
           reopen_count: 0,
           hold: null,
           resolution_summary: null,
+          feedback: null,
           sla: { level: 0, kind: null, paused: false, stopped: false, due_at: null, label: '' },
           allowed_actions: [],
           attachments: resolveAttachments(body.attachment_ids),
@@ -212,8 +215,8 @@ export const ticketHandlers = [
         critical: rec.ticket.priority === 'critical',
         ticket_id: rec.ticket.id,
       });
-      if (rec.ticket.priority === 'critical' && dept.escalation_primary) {
-        notifyUsers([dept.escalation_primary.id], {
+      if (rec.ticket.priority === 'critical' && dept.escalation_contact) {
+        notifyUsers([dept.escalation_contact.id], {
           text: `Critical ticket ${rec.ticket.id} raised in ${dept.name} (${rec.ticket.title})`,
           kind: 'ticket_created',
           critical: true,

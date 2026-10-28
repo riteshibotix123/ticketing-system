@@ -25,6 +25,13 @@ function myNotifications(user: DbUser) {
 }
 
 export const notificationHandlers = [
+  http.get(p('/notifications/unread-count'), ({ request }) =>
+    respond(request, () => {
+      const user = requireUser(request);
+      return ok({ count: myNotifications(user).filter((n) => !n.read).length }, request);
+    }),
+  ),
+
   http.get(p('/notifications'), ({ request }) =>
     respond(request, () => {
       const user = requireUser(request);
@@ -164,6 +171,8 @@ export const dashboardHandlers = [
         l3_count: openRecs.filter((r) => r.ticket.sla.level === 3).length,
         stale_count: openRecs.filter(stale).length,
         reopen_rate_pct: all.length === 0 ? 0 : Math.round((reopens / all.length) * 100),
+        pending_approvals: db.signupRequests.filter((request) => request.status === 'pending')
+          .length,
         by_department: db.departments.map((d) => {
           const rows = openRecs.filter((r) => r.ticket.department_id === d.id);
           return {
@@ -214,6 +223,7 @@ export const dashboardHandlers = [
         resolved_to_confirm: mine.filter((r) => r.ticket.status === 'resolved').length,
         closed: mine.filter((r) => r.ticket.status === 'closed' || r.ticket.status === 'cancelled')
           .length,
+        assigned_to_me: scopedTickets(user, 'assigned').filter((r) => open(r)).length,
         recent_updates: recent,
         attention: attention(mine.filter(open), user),
       };

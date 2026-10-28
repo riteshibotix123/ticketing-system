@@ -21,17 +21,16 @@ import { useToast } from '@/hooks/useToast';
 import { departmentFormSchema, type DepartmentFormInput } from '@/lib/zod-schemas';
 import type { Department } from '@/types/domain';
 
-/** Rule 10.3: a department cannot be active without at least one active Spoke. */
 export const SPOKE_RULE_MESSAGE =
   'Add at least one active Spoke before activating this department.';
 
-/** Create / edit a department (name, active, confidential) — spec 9.13. */
+export const DEPARTMENT_CODE_MESSAGE = 'Use 2 to 6 uppercase letters.';
+
 export function DepartmentDialog({
   department,
   open,
   onOpenChange,
 }: {
-  /** null → create mode. */
   department: Department | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,31 +38,32 @@ export function DepartmentDialog({
   const { success } = useToast();
   const qc = useQueryClient();
   const activeId = useId();
-  const confidentialId = useId();
   const [serverError, setServerError] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, setValue, setError, formState } =
     useForm<DepartmentFormInput>({
       resolver: zodResolver(departmentFormSchema),
       defaultValues: department
-        ? {
-            name: department.name,
-            active: department.active,
-            confidential: department.confidential,
-          }
-        : { name: '', active: false, confidential: false },
+        ? { name: department.name, active: department.active }
+        : { name: '', active: false },
     });
 
   const spokeCount = department?.spokes.length ?? 0;
   const activeValue = watch('active');
-  const confidentialValue = watch('confidential');
   const violatesSpokeRule = activeValue && spokeCount === 0;
   const activeError =
     formState.errors.active?.message ?? (violatesSpokeRule ? SPOKE_RULE_MESSAGE : undefined);
 
   const mutation = useMutation({
-    mutationFn: (values: DepartmentFormInput) =>
-      department ? departmentsApi.update(department.id, values) : departmentsApi.create(values),
+    mutationFn: (values: DepartmentFormInput) => {
+      if (department) {
+        return departmentsApi.update(department.id, { name: values.name, active: values.active });
+      }
+      return departmentsApi.create({
+        id: values.id ?? '',
+        name: values.name,
+      });
+    },
     onSuccess: () => {
       success('Department saved.');
       void qc.invalidateQueries({ queryKey: queryKeys.departments });
@@ -73,7 +73,7 @@ export function DepartmentDialog({
       setServerError(errorMessage(err));
       if (isApiError(err) && err.fields) {
         for (const [key, message] of Object.entries(err.fields)) {
-          if (key === 'name' || key === 'active' || key === 'confidential') {
+          if (key === 'id' || key === 'name' || key === 'active') {
             setError(key, { message });
           }
         }
@@ -82,6 +82,10 @@ export function DepartmentDialog({
   });
 
   const onSubmit = (values: DepartmentFormInput) => {
+    if (!department && !values.id) {
+      setError('id', { message: DEPARTMENT_CODE_MESSAGE });
+      return;
+    }
     if (values.active && spokeCount === 0) {
       setError('active', { message: SPOKE_RULE_MESSAGE });
       return;
@@ -101,16 +105,33 @@ export function DepartmentDialog({
           <DialogTitle>{department ? 'Edit department' : 'New department'}</DialogTitle>
           <DialogDescription>
             {department
-              ? 'Update the department details.'
+              ? 'Update the department details. The code cannot change.'
               : 'Create a department. It starts inactive until it has a Spoke.'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          {department ? (
+            <p className="text-small text-muted">
+              Code <span className="font-mono text-fg">{department.id}</span>
+            </p>
+          ) : (
+            <FormField label="Code" required error={formState.errors.id?.message}>
+              <Input
+                {...register('id')}
+                placeholder="e.g. IT"
+                maxLength={6}
+                autoCapitalize="characters"
+                disabled={mutation.isPending}
+                aria-invalid={formState.errors.id ? true : undefined}
+              />
+            </FormField>
+          )}
+
           <FormField label="Name" required error={formState.errors.name?.message}>
             <Input
               {...register('name')}
-              placeholder="e.g. IT"
+              placeholder="e.g. IT & Infrastructure"
               maxLength={80}
               disabled={mutation.isPending}
               aria-invalid={formState.errors.name ? true : undefined}
@@ -138,23 +159,6 @@ export function DepartmentDialog({
                 {activeError}
               </p>
             ) : null}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id={confidentialId}
-                checked={confidentialValue}
-                onCheckedChange={(v) => setValue('confidential', v === true)}
-                disabled={mutation.isPending}
-              />
-              <label htmlFor={confidentialId} className="text-small font-medium text-fg">
-                Confidential
-              </label>
-            </div>
-            <p className="text-small text-muted">
-              Only authorised leads can open confidential tickets for this department.
-            </p>
           </div>
 
           {serverError ? (

@@ -5,7 +5,7 @@
  */
 import { http } from 'msw';
 import type { PolicyConfig } from '@/types/domain';
-import { db, findUser } from '../db';
+import { db } from '../db';
 import {
   actorRef,
   addAudit,
@@ -17,7 +17,6 @@ import {
   throw404,
   throw422,
 } from '../helpers';
-import { serializeUser } from '../access';
 import { recomputeAll } from '../sla';
 import { assertCanManageDepartments, assertPolicyManager, loadDepartment } from './deptShared';
 import { requireUser } from './guard';
@@ -31,7 +30,7 @@ export const departmentExtrasHandlers = [
       const user = requireUser(request);
       assertCanManageDepartments(user);
       const dept = loadDepartment(String(params.id));
-      const body = await readJson<{ name?: string }>(request);
+      const body = await readJson<{ name?: string; confidential?: boolean }>(request);
       const name = str(body.name);
       if (name.length < 2) throw422({ name: 'Enter a category name.' });
       if (dept.categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
@@ -41,6 +40,8 @@ export const departmentExtrasHandlers = [
         id: `c-${dept.id.toLowerCase()}-${dept.categories.length + 1}`,
         name,
         department_id: dept.id,
+        confidential: body.confidential === true,
+        active: true,
       });
       addAudit({
         actor: actorRef(user),
@@ -62,22 +63,13 @@ export const departmentExtrasHandlers = [
         .find((c) => c.id === String(params.categoryId));
       if (!category) throw404();
       const dept = loadDepartment(category.department_id);
-      const body = await readJson<{ name?: string; escalation_override_id?: string | null }>(
-        request,
-      );
+      const body = await readJson<{ name?: string; confidential?: boolean }>(request);
       if (typeof body.name === 'string') {
         const name = str(body.name);
         if (name.length < 2) throw422({ name: 'Enter a category name.' });
         category.name = name;
       }
-      if ('escalation_override_id' in body) {
-        const id = str(body.escalation_override_id);
-        const contact = id ? findUser(id) : null;
-        if (id && (!contact || contact.state !== 'active')) {
-          throw422({ escalation_override_id: 'Pick an active user.' });
-        }
-        category.escalation_override = contact ? serializeUser(contact) : null;
-      }
+      if (typeof body.confidential === 'boolean') category.confidential = body.confidential;
       addAudit({
         actor: actorRef(user),
         action: 'department.category_updated',
@@ -136,14 +128,23 @@ export const departmentExtrasHandlers = [
         fields.update_cadence_hours = 'Use a positive number of hours.';
       if (!(num(body.requester_reminder_hours) > 0))
         fields.requester_reminder_hours = 'Use a positive number of hours.';
+      if (!(num(body.update_warning_hours) > 0))
+        fields.update_warning_hours = 'Use a positive number of hours.';
+      if (!(num(body.eta_warning_hours) > 0))
+        fields.eta_warning_hours = 'Use a positive number of hours.';
+      if (!(num(body.escalation_repeat_hours) > 0))
+        fields.escalation_repeat_hours = 'Use a positive number of hours.';
+      if (!(num(body.reopen_window_days) >= 0))
+        fields.reopen_window_days = 'Use zero or more days.';
+      if (!(num(body.max_reopens) >= 0)) fields.max_reopens = 'Use zero or more reopens.';
       for (const priority of ['low', 'medium', 'high', 'critical'] as const) {
         if (!(num(body.warning_hours?.[priority]) > 0))
           fields[`warning_hours.${priority}`] = 'Use a positive number of hours.';
         if (!(num(body.l3_hours?.[priority]) > 0))
           fields[`l3_hours.${priority}`] = 'Use a positive number of hours.';
       }
-      if (body.sla_mode !== 'calendar' && body.sla_mode !== 'business') {
-        fields.sla_mode = 'Choose calendar or business hours.';
+      if (body.sla_mode !== 'calendar') {
+        fields.sla_mode = 'Calendar hours is the only mode available.';
       }
       if (Object.keys(fields).length > 0) throw422(fields);
 
@@ -152,12 +153,17 @@ export const departmentExtrasHandlers = [
         initial_response_hours: body.initial_response_hours,
         warning_hours: { ...body.warning_hours },
         l3_hours: { ...body.l3_hours },
+        update_warning_hours: body.update_warning_hours,
         update_cadence_hours: body.update_cadence_hours,
+        eta_warning_hours: body.eta_warning_hours,
+        escalation_repeat_hours: body.escalation_repeat_hours,
         sla_mode: body.sla_mode,
         admins_can_manage_departments: body.admins_can_manage_departments === true,
         requester_reminder_hours: body.requester_reminder_hours,
         auto_close_business_days:
           typeof body.auto_close_business_days === 'number' ? body.auto_close_business_days : null,
+        reopen_window_days: body.reopen_window_days,
+        max_reopens: body.max_reopens,
       };
       recomputeAll(); // every open ticket's levels may change
       addAudit({

@@ -143,9 +143,7 @@ function escalationRecipients(rec: DbTicket, level: 0 | 1 | 2 | 3): { id: string
   const spokes = spokesOf(t.department_id).map((u) => ({ id: u.id }));
   const admins = usersWithRole('admin').map((u) => ({ id: u.id }));
   const supers = usersWithRole('super_admin').map((u) => ({ id: u.id }));
-  const contact = [dept?.escalation_primary, dept?.escalation_backup]
-    .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    .map((c) => ({ id: c.id }));
+  const contact = dept?.escalation_contact ? [{ id: dept.escalation_contact.id }] : [];
 
   let list: { id: string }[];
   if (level === 1) {
@@ -175,8 +173,7 @@ function confidentialText(rec: DbTicket, user: { id: string }, full: string): st
     rec.ticket.requester.id === user.id ||
     rec.ticket.owner?.id === user.id ||
     rec.ticket.assignee?.id === user.id ||
-    u?.roles.includes('super_admin') ||
-    u?.roles.includes('admin') ||
-    (u ? u.confidential_departments.includes(rec.ticket.department_id) : false);
+    rec.ticket.collaborators.some((c) => c.id === user.id) ||
+    Boolean(u?.roles.includes('super_admin'));
   return allowed ? full : `New escalation on ${rec.ticket.id}. Open the ticket for details.`;
 }

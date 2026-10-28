@@ -119,12 +119,14 @@ export const ticketDetailHandlers = [
         /* not multipart */
       }
       if (!file) throw422({ file: 'Choose a file to upload.' });
-      const max = PUBLIC_CONFIG.max_attachment_bytes;
+      const max = PUBLIC_CONFIG.attachment_limits.max_bytes;
       if (file.size > max) {
         throw422({ file: `Attachments must be ${Math.round(max / 1_048_576)} MB or smaller.` });
       }
-      if (!PUBLIC_CONFIG.allowed_attachment_mimes.includes(file.type)) {
-        throw422({ file: `Allowed types: ${PUBLIC_CONFIG.allowed_attachment_mimes.join(', ')}.` });
+      if (!PUBLIC_CONFIG.attachment_limits.allowed_mime_types.includes(file.type)) {
+        throw422({
+          file: `Allowed types: ${PUBLIC_CONFIG.attachment_limits.allowed_mime_types.join(', ')}.`,
+        });
       }
       const id = uid('att');
       const attachment = {

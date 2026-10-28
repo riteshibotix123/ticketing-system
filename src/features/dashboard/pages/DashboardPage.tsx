@@ -112,7 +112,7 @@ export default function DashboardPage() {
 
           <AttentionTable tickets={attention} isStaff={isStaff} />
 
-          {view === 'admin' && adminQuery.data ? (
+          {view === 'admin' && adminQuery.data?.by_department ? (
             <DepartmentBars rows={adminQuery.data.by_department} />
           ) : null}
 

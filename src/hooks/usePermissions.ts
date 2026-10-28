@@ -23,9 +23,8 @@ export interface PermissionsApi {
     requestedRole: 'employee' | 'admin' | 'super_admin',
     isSelf: boolean,
   ) => boolean;
-  grantableRoles: Role[];
+  grantableRoles: Array<'employee' | 'admin' | 'super_admin'>;
   isSpokeFor: (departmentId: string) => boolean;
-  canSeeConfidentialIn: (departmentId: string) => boolean;
 }
 
 /**
@@ -48,9 +47,6 @@ export function usePermissions(): PermissionsApi {
       canApproveSignup: (requestedRole, isSelf) => canApproveSignup(base, requestedRole, isSelf),
       grantableRoles: grantableRoles(base),
       isSpokeFor: (departmentId) => (me?.spoke_departments ?? []).includes(departmentId),
-      canSeeConfidentialIn: (departmentId) =>
-        hasPermission(base, 'tickets.view_all') ||
-        (me?.confidential_departments ?? []).includes(departmentId),
     };
   }, [me, status]);
 }

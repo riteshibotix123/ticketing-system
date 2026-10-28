@@ -13,7 +13,7 @@ export const API_BASE = process.env.E2E_API_BASE_URL ?? 'http://localhost:8000/a
 export const PEOPLE = {
   employee: 'asha.verma@ibotix.ai',
   spoke: 'rohan.mehta@ibotix.ai',
-  resolver: 'dev.patel@ibotix.ai',
+  assignee: 'dev.patel@ibotix.ai',
   admin: 'priya.nair@ibotix.ai',
   superAdmin: 'karan.shah@ibotix.ai',
 } as const;

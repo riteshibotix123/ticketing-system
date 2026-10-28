@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+﻿import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Bell,
@@ -56,7 +56,7 @@ export function Sidebar() {
 
   const { data: pending } = useQuery({
     queryKey: queryKeys.pendingSignupCount,
-    queryFn: () => usersApi.pendingCount(),
+    queryFn: () => usersApi.pendingSignupCount(),
     enabled: flags.approvals,
     refetchInterval: 60_000,
     retry: false,
@@ -75,7 +75,7 @@ export function Sidebar() {
             to: '/approvals',
             label: 'Access requests',
             icon: ShieldCheck,
-            badge: pending?.count ?? 0,
+            badge: pending ?? 0,
           },
         ]
       : []),
@@ -132,3 +132,4 @@ export function Sidebar() {
     </nav>
   );
 }
+

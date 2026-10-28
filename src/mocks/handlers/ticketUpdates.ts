@@ -76,8 +76,8 @@ export const ticketUpdateHandlers = [
       );
       if (t.priority === 'critical') {
         const dept = findDepartment(t.department_id);
-        if (dept?.escalation_primary) {
-          notifyUsers([dept.escalation_primary.id], {
+        if (dept?.escalation_contact) {
+          notifyUsers([dept.escalation_contact.id], {
             text: `Critical ticket ${t.id} (${t.title}) in ${dept.name}`,
             kind: 'escalation',
             critical: true,

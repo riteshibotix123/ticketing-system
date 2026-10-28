@@ -1,6 +1,6 @@
 /**
  * Spec 15/17: the BRD section-20 control loop end to end, through the UI only.
- * Employee raises → Spoke acknowledges and delegates → Resolver resolves →
+ * Employee raises → Spoke acknowledges and delegates → Assignee resolves →
  * Requester confirms the closure.
  */
 import { test, expect } from '@playwright/test';
@@ -50,9 +50,9 @@ test.describe('BRD §20 control loop', () => {
     await page.getByRole('button', { name: 'Delegate', exact: true }).click();
     await expect(page.getByRole('main')).toContainText('Delegated to Dev Patel');
 
-    // 3. The resolver resolves it.
+    // 3. The assignee resolves it.
     await logout(page);
-    await login(page, PEOPLE.resolver);
+    await login(page, PEOPLE.assignee);
     await page.getByRole('link', { name: 'Tickets' }).first().click();
     await page.getByRole('tab', { name: 'Assigned to me' }).click();
     await openTicketFromList(page, title);

@@ -32,11 +32,10 @@ Anything the spec did not decide, marked `// ASSUMPTION:` in code and listed her
 10. **Single `tsconfig.json`** (no project references) so `npm run typecheck` stays one command.
 11. **Recharts is pinned to v2** — the API used for the department bars is stable and compatible
     with React 18; v3's migration guide is not needed for a single stacked bar chart.
-12. **`GET /users` is readable by Spokes.** Spec 9.7 makes a Spoke pick an eligible resolver when
-    delegating, but the endpoint table (section 6) does not name a permission for the directory
-    read. The mock allows callers with `tickets.assign` (Spokes/Admins) to list users; role changes
-    stay behind `users.manage_roles`. The real backend should mirror this read permission or expose
-    a narrower "assignable people" endpoint — only `src/api/endpoints/users.ts` and the mock change.
+12. **`GET /departments/{id}/members` is the assignee source.** Spokes and Admins pick an active
+    member of the ticket's department when delegating; the user directory stays behind
+    `users.manage_roles`. The contract exposes no broader "assignable people" endpoint, so the
+    mock derives members from each user's home department and Spoke assignments.
 13. **Configuration sub-navigation.** The sidebar links only `/config/departments`, so a shared
     `ConfigTabs` strip (Departments / Policy / Admin accounts, the last gated by `admins.manage`)
     sits on all three screens; without it Policy and Admin accounts were unreachable by navigation.

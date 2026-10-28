@@ -80,8 +80,15 @@ export function CreateTicketForm() {
   const description = watch('description');
 
   const selectedDepartment = departments.find((d) => d.id === departmentId) ?? null;
-  const categories = selectedDepartment?.categories ?? [];
-  const confidentialAllowed = Boolean(selectedDepartment?.confidential);
+  const categories = (selectedDepartment?.categories ?? []).filter((category) => category.active);
+  const selectedCategory = categories.find((category) => category.id === categoryId) ?? null;
+  const confidentialAllowed = Boolean(selectedCategory?.confidential);
+
+  const pickCategory = (id: string) => {
+    setValue('category_id', id, { shouldValidate: true });
+    const category = categories.find((item) => item.id === id) ?? null;
+    setValue('confidential', Boolean(category?.confidential));
+  };
 
   // Changing department clears the now-invalid category and confidential flag.
   // A ref guard skips the first run so a restored draft survives the mount.
@@ -159,8 +166,8 @@ export function CreateTicketForm() {
         hint={selectedDepartment ? undefined : 'Choose a department first.'}
       >
         <CategorySelect
-          value={categoryId}
-          onChange={(id) => setValue('category_id', id, { shouldValidate: true })}
+          value={categoryId ?? ''}
+          onChange={pickCategory}
           categories={categories}
           disabled={!selectedDepartment}
         />
@@ -207,15 +214,9 @@ export function CreateTicketForm() {
       {confidentialAllowed ? (
         <FormField label="Confidential" hint={CONFIDENTIAL_HELP}>
           <span className="flex w-fit items-center gap-2">
-            <Checkbox
-              id="ct-confidential"
-              checked={confidential}
-              onCheckedChange={(v) =>
-                setValue('confidential', v === true, { shouldValidate: true })
-              }
-            />
-            <label htmlFor="ct-confidential" className="cursor-pointer text-body text-fg">
-              Mark this ticket as confidential
+            <Checkbox id="ct-confidential" checked={confidential} disabled />
+            <label htmlFor="ct-confidential" className="text-body text-fg">
+              This category is confidential
             </label>
           </span>
         </FormField>

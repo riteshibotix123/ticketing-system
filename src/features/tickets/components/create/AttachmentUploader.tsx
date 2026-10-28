@@ -53,9 +53,9 @@ export function AttachmentUploader({
     queryFn: () => authApi.publicConfig(),
     retry: false,
   });
-  const maxBytes = configQuery.data?.max_attachment_bytes ?? FALLBACK_MAX_BYTES;
+  const maxBytes = configQuery.data?.attachment_limits.max_bytes ?? FALLBACK_MAX_BYTES;
   const allowedMimes = useMemo(
-    () => configQuery.data?.allowed_attachment_mimes ?? [],
+    () => configQuery.data?.attachment_limits.allowed_mime_types ?? [],
     [configQuery.data],
   );
 

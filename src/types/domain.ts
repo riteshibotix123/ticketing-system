@@ -1,13 +1,11 @@
-/**
- * Domain types — intended shapes from the spec (section 5).
- * Generated API types (`src/api/schema.d.ts`) are the source of truth when the
- * real backend is wired up; these are used by the mock layer and adapters.
- */
-
-export type Role = 'super_admin' | 'admin' | 'spoke' | 'resolver' | 'employee';
+export type Role = 'super_admin' | 'admin' | 'spoke' | 'employee';
 
 export type AccountState =
-  'pending_verification' | 'pending_approval' | 'active' | 'rejected' | 'deactivated';
+  | 'pending_verification'
+  | 'pending_approval'
+  | 'active'
+  | 'rejected'
+  | 'deactivated';
 
 export type Priority = 'low' | 'medium' | 'high' | 'critical';
 
@@ -34,40 +32,27 @@ export interface Me extends UserRef {
   roles: Role[];
   department_id: string | null;
   spoke_departments: string[];
-  confidential_departments: string[];
   permissions: string[];
   mfa_enabled: boolean;
   theme?: 'system' | 'light' | 'dark';
 }
 
-/** Full user record as returned by `/users`. */
-export interface User extends UserRef {
-  roles: Role[];
-  department_id: string | null;
-  state: AccountState;
-  spoke_departments: string[];
-  confidential_departments: string[];
-  mfa_enabled: boolean;
-  created_at: string;
-  title?: string;
-}
-
 export interface Category {
   id: string;
-  name: string;
   department_id: string;
-  escalation_override?: UserRef | null;
+  name: string;
+  confidential: boolean;
+  active: boolean;
 }
 
 export interface Department {
   id: string;
   name: string;
-  spokes: UserRef[];
-  escalation_primary: UserRef | null;
-  escalation_backup: UserRef | null;
-  confidential: boolean;
-  categories: Category[];
   active: boolean;
+  accepts_tickets: boolean;
+  spokes: UserRef[];
+  escalation_contact: UserRef | null;
+  categories: Category[];
 }
 
 export type SlaKind = 'initial_response' | 'progress_update' | 'eta';
@@ -90,25 +75,24 @@ export type TicketAction =
   | 'start_work'
   | 'ask_requester'
   | 'hold'
+  | 'resume'
   | 'resolve'
   | 'confirm_closure'
   | 'reopen'
   | 'cancel'
+  | 'close_admin'
   | 'comment'
-  | 'internal_note';
+  | 'internal_note'
+  | 'manage_collaborators';
+
+export type ScanStatus = 'pending' | 'clean' | 'infected';
 
 export interface Attachment {
   id: string;
   name: string;
   size: number;
   mime: string;
-  scan_status: 'pending' | 'clean' | 'infected';
-  url?: string;
-}
-
-export interface HoldState {
-  reason: string;
-  review_date: string;
+  scan_status: ScanStatus;
 }
 
 export interface Ticket {
@@ -116,9 +100,10 @@ export interface Ticket {
   title: string;
   description: string;
   department_id: string;
-  category_id: string;
-  category_name: string;
+  category_id: string | null;
+  category_name: string | null;
   priority: Priority;
+  requested_priority: Priority;
   status: TicketStatus;
   confidential: boolean;
   requester: UserRef;
@@ -129,12 +114,14 @@ export interface Ticket {
   sla_started_at: string;
   acknowledged_at: string | null;
   eta: string | null;
+  next_checkpoint_at: string | null;
   last_team_update_at: string | null;
   resolved_at: string | null;
   closed_at: string | null;
   reopen_count: number;
-  hold: HoldState | null;
+  hold: { reason: string; review_date: string } | null;
   resolution_summary: string | null;
+  feedback: { rating: number | null; comment: string | null } | null;
   sla: SlaState;
   allowed_actions: TicketAction[];
   attachments: Attachment[];
@@ -160,6 +147,8 @@ export interface TimelineEvent {
   public: boolean;
 }
 
+export type SignupStatus = 'pending' | 'approved' | 'rejected';
+
 export interface SignupRequest {
   id: string;
   name: string;
@@ -169,11 +158,47 @@ export interface SignupRequest {
   requested_department: string;
   approved_role?: Role;
   approved_department?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: SignupStatus;
   decided_by?: UserRef;
   decided_at?: string;
   rejection_reason?: string;
   created_at: string;
+  can_approve: boolean;
+}
+
+export interface UserListItem extends UserRef {
+  roles: Role[];
+  state: AccountState;
+  department_id: string | null;
+  spoke_departments: string[];
+  last_login_at: string | null;
+  created_at: string;
+}
+
+export type ProtectedActionKind = 'deactivate_super_admin' | 'demote_super_admin';
+
+export type ProtectedActionStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+
+export interface ProtectedAction {
+  id: string;
+  kind: ProtectedActionKind;
+  target: UserRef;
+  requested_by: UserRef;
+  reason: string;
+  status: ProtectedActionStatus;
+  decided_by?: UserRef;
+  decision_reason?: string;
+  created_at: string;
+  expires_at: string;
+  can_decide: boolean;
+}
+
+export interface ConfidentialGrant {
+  id: string;
+  user: UserRef;
+  category: Category;
+  granted_by: UserRef;
+  granted_at: string;
 }
 
 export interface Notification {
@@ -203,35 +228,33 @@ export interface PolicyConfig {
   initial_response_hours: number;
   warning_hours: Record<Priority, number>;
   l3_hours: Record<Priority, number>;
+  update_warning_hours: number;
   update_cadence_hours: number;
-  sla_mode: 'calendar' | 'business';
-  admins_can_manage_departments: boolean;
+  eta_warning_hours: number;
+  escalation_repeat_hours: number;
   requester_reminder_hours: number;
   auto_close_business_days: number | null;
+  reopen_window_days: number;
+  max_reopens: number;
+  sla_mode: 'calendar' | 'business';
+  admins_can_manage_departments: boolean;
 }
 
-export interface Paged<T> {
-  items: T[];
-  total: number;
-  page: number;
-  page_size: number;
+export interface PublicConfig {
+  allowed_email_domains: string[];
+  departments: { id: string; name: string }[];
+  attachment_limits: { max_bytes: number; max_files: number; allowed_mime_types: string[] };
+  password_min_length: number;
+  first_response_hours: number;
 }
 
-export interface AdminDashboard {
-  open_count: number;
-  sla_met_pct: number;
-  avg_initial_response_seconds: number;
-  breached_count: number;
-  l3_count: number;
-  stale_count: number;
-  reopen_rate_pct: number;
-  by_department: {
-    department_id: string;
-    name: string;
-    on_track: number;
-    warning: number;
-    breached: number;
-  }[];
+export interface EmployeeDashboard {
+  open: number;
+  awaiting_my_response: number;
+  resolved_to_confirm: number;
+  closed: number;
+  assigned_to_me: number;
+  recent_updates: TimelineEvent[];
   attention: Ticket[];
 }
 
@@ -246,23 +269,28 @@ export interface SpokeDashboard {
   attention: Ticket[];
 }
 
-export interface EmployeeDashboard {
-  open: number;
-  awaiting_my_response: number;
-  resolved_to_confirm: number;
-  closed: number;
-  recent_updates: TimelineEvent[];
+export interface AdminDashboard {
+  open_count: number;
+  breached_count: number;
+  l3_count: number;
+  stale_count: number;
+  pending_approvals: number;
+  sla_met_pct: number | null;
+  avg_initial_response_seconds: number | null;
+  reopen_rate_pct: number | null;
+  by_department: {
+    department_id: string;
+    name: string;
+    on_track: number;
+    warning: number;
+    breached: number;
+  }[] | null;
   attention: Ticket[];
 }
 
-export type DashboardData = AdminDashboard | SpokeDashboard | EmployeeDashboard;
-
-/** Public runtime config from `GET /public/config`. */
-export interface PublicConfig {
-  app_name: string;
-  allowed_email_domains: string[];
-  max_attachment_bytes: number;
-  allowed_attachment_mimes: string[];
-  personas_enabled: boolean;
-  demo_clock_enabled: boolean;
+export interface Paged<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
 }

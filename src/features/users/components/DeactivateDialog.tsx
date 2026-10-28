@@ -6,7 +6,7 @@ import { errorMessage, isApiError } from '@/api/client';
 import { usersApi } from '@/api/endpoints/users';
 import { useToast } from '@/hooks/useToast';
 import { reasonSchema } from '@/lib/zod-schemas';
-import type { User } from '@/types/domain';
+import type { UserListItem } from '@/types/domain';
 
 /**
  * Deactivate or activate an account: an in-page ConfirmDialog with a required
@@ -17,7 +17,7 @@ export function DeactivateDialog({
   open,
   onOpenChange,
 }: {
-  user: User;
+  user: UserListItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -30,11 +30,18 @@ export function DeactivateDialog({
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const mutation = useMutation({
-    mutationFn: (value: string) =>
-      activating ? usersApi.activate(user.id, value) : usersApi.deactivate(user.id, value),
-    onSuccess: () => {
-      success(activating ? 'Account activated.' : 'Account deactivated.');
+  const mutation = useMutation<unknown, unknown, string | null>({
+    mutationFn: (value: string | null) =>
+      activating ? usersApi.activate(user.id) : usersApi.deactivate(user.id, value ?? ''),
+    onSuccess: (data) => {
+      const result = data as { result?: string } | null;
+      success(
+        result?.result === 'protected_request_created'
+          ? 'Sent for second Super Admin approval.'
+          : activating
+            ? 'Account activated.'
+            : 'Account deactivated.',
+      );
       void queryClient.invalidateQueries({ queryKey: ['users'] });
       void queryClient.invalidateQueries({ queryKey: ['signup-requests'] });
       onOpenChange(false);
@@ -46,6 +53,10 @@ export function DeactivateDialog({
   });
 
   const confirm = () => {
+    if (activating) {
+      mutation.mutate(null);
+      return;
+    }
     const parsed = reasonSchema.safeParse({ reason });
     if (!parsed.success) {
       setReasonError(parsed.error.issues[0]?.message ?? 'Required.');

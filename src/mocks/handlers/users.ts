@@ -5,7 +5,7 @@
  * here — they live under Configuration → Admin accounts.
  */
 import { http } from 'msw';
-import type { Role, User } from '@/types/domain';
+import type { Role, UserListItem } from '@/types/domain';
 import { db, findUser, paginate, syncSpokes, type DbUser } from '../db';
 import {
   actorRef,
@@ -24,13 +24,10 @@ import { invalidateUserTokens } from '../auth';
 import { requireUser } from './guard';
 import { p } from './paths';
 
-const ALL_ROLES: Role[] = ['super_admin', 'admin', 'spoke', 'resolver', 'employee'];
-
-/** Roles the viewer may grant directly (mirrors lib/permissions grantableRoles). */
-export function grantableRoles(user: DbUser): Role[] {
-  const out: Role[] = [];
+/** Roles the viewer may grant on a signup (mirrors lib/permissions grantableRoles). */
+export function grantableRoles(user: DbUser): Array<'employee' | 'admin' | 'super_admin'> {
+  const out: Array<'employee' | 'admin' | 'super_admin'> = [];
   if (can(user, 'users.approve_employee')) out.push('employee');
-  if (can(user, 'users.manage_roles')) out.push('spoke', 'resolver');
   if (can(user, 'users.approve_admin')) out.push('admin');
   if (can(user, 'users.approve_super_admin')) out.push('super_admin');
   return out;
@@ -41,7 +38,7 @@ export function isAdminRow(user: DbUser): boolean {
   return user.roles.includes('admin') || user.roles.includes('super_admin');
 }
 
-function maskFor(user: DbUser): User {
+function maskFor(user: DbUser): UserListItem {
   return serializeUser(user);
 }
 
@@ -49,7 +46,7 @@ export const userHandlers = [
   http.get(p('/users'), ({ request }) =>
     respond(request, () => {
       const viewer = requireUser(request);
-      // Spokes delegate tickets (spec 9.7: eligible resolvers of the department),
+      // Spokes delegate tickets (spec 9.7: eligible members of the department),
       // so they need read access to the directory; role changes stay gated below.
       if (
         !can(viewer, 'users.manage_roles') &&
@@ -86,50 +83,32 @@ export const userHandlers = [
       if (target.id === viewer.id) throw403('You cannot change your own roles.');
 
       const body = await readJson<{
-        add?: string[];
-        remove?: string[];
-        department_ids?: string[];
-        confidential_departments?: string[];
+        spoke_departments?: string[];
         reason?: string;
       }>(request);
       const reason = str(body.reason);
       if (!reason) throw422({ reason: 'Every role change needs a reason.' });
-      const grants = grantableRoles(viewer);
-      const add = (Array.isArray(body.add) ? body.add : []).filter((r): r is Role =>
-        ALL_ROLES.includes(r as Role),
-      );
-      const remove = (Array.isArray(body.remove) ? body.remove : []).filter((r): r is Role =>
-        ALL_ROLES.includes(r as Role),
-      );
-      for (const role of add) {
-        if (!grants.includes(role)) throw403(`You cannot grant the ${role} role.`);
-      }
-
-      const before = [...target.roles];
-      target.roles = [...new Set([...target.roles.filter((r) => !remove.includes(r)), ...add])];
-      if (Array.isArray(body.department_ids)) {
-        for (const id of body.department_ids) {
-          if (!db.departments.some((d) => d.id === id))
-            throw422({ department_ids: `Unknown department ${id}.` });
-        }
-        target.spoke_departments = body.department_ids;
-      }
-      if (Array.isArray(body.confidential_departments)) {
-        for (const id of body.confidential_departments) {
-          if (!target.spoke_departments.includes(id)) {
-            throw422({
-              confidential_departments:
-                'Confidential access requires Spoke access to that department.',
-            });
+      const spokeDepartments = Array.isArray(body.spoke_departments)
+        ? [...new Set(body.spoke_departments)]
+        : null;
+      if (spokeDepartments) {
+        for (const id of spokeDepartments) {
+          if (!db.departments.some((d) => d.id === id)) {
+            throw422({ spoke_departments: `Unknown department ${id}.` });
           }
         }
-        target.confidential_departments = body.confidential_departments;
       }
-      // A Spoke without departments is no longer a Spoke.
-      if (target.roles.includes('spoke') && target.spoke_departments.length === 0) {
-        target.roles = target.roles.filter((r) => r !== 'spoke');
+
+      const before = [...target.spoke_departments];
+      if (spokeDepartments) {
+        target.spoke_departments = spokeDepartments;
+        if (spokeDepartments.length > 0 && !target.roles.includes('spoke')) {
+          target.roles.push('spoke');
+        }
+        if (spokeDepartments.length === 0) {
+          target.roles = target.roles.filter((r) => r !== 'spoke');
+        }
       }
-      if (target.state === 'pending_approval' && target.roles.length > 0) target.state = 'active';
       syncSpokes();
 
       addAudit({
@@ -138,8 +117,8 @@ export const userHandlers = [
         object_type: 'user',
         object_id: target.id,
         old_value: before,
-        new_value: [...target.roles],
-        detail: `Roles for ${target.name}: ${before.join(', ') || 'none'} → ${target.roles.join(', ') || 'none'}`,
+        new_value: [...target.spoke_departments],
+        detail: `Spoke departments for ${target.name}: ${before.join(', ') || 'none'} → ${target.spoke_departments.join(', ') || 'none'}`,
         reason,
       });
       return ok(maskFor(target), request);
@@ -169,19 +148,25 @@ export const userHandlers = [
         detail: `${target.name} deactivated`,
         reason,
       });
-      return ok(maskFor(target), request);
+      const openTicketCount = db.tickets.filter(
+        (rec) =>
+          rec.ticket.requester.id === target.id &&
+          rec.ticket.status !== 'closed' &&
+          rec.ticket.status !== 'cancelled',
+      ).length;
+      return ok(
+        { result: 'deactivated', open_ticket_count: openTicketCount, protected_action_id: null },
+        request,
+      );
     }),
   ),
 
   http.post(p('/users/:id/activate'), ({ params, request }) =>
-    respond(request, async () => {
+    respond(request, () => {
       const viewer = requireUser(request);
       if (!can(viewer, 'users.manage_roles')) throw403();
       const target = findUser(String(params.id));
       if (!target) throw404();
-      const body = await readJson<{ reason?: string }>(request);
-      const reason = str(body.reason);
-      if (!reason) throw422({ reason: 'Give a reason for activating this account.' });
       target.state = 'active';
       syncSpokes();
       addAudit({
@@ -190,7 +175,6 @@ export const userHandlers = [
         object_type: 'user',
         object_id: target.id,
         detail: `${target.name} activated`,
-        reason,
       });
       return ok(maskFor(target), request);
     }),

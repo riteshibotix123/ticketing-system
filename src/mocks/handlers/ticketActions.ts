@@ -36,19 +36,25 @@ export const ticketActionHandlers = [
       const user = requireUser(request);
       const rec = loadTicket(String(params.id));
       assertAction(rec, user, 'acknowledge');
-      const body = await readJson<{ eta?: string; no_eta_reason?: string; checkpoint?: string }>(
-        request,
-      );
+      const body = await readJson<{
+        eta?: string;
+        no_eta_reason?: string;
+        next_checkpoint_at?: string;
+      }>(request);
       const now = Date.now();
 
       let etaIso: string | null = null;
+      let checkpointIso: string | null = null;
       if (str(body.eta)) {
         etaIso = new Date(futureMs(body.eta, 'eta')).toISOString();
       } else {
-        // Spec 10.4: no ETA needs a reason AND a next checkpoint.
         const fields: Record<string, string> = {};
         if (!str(body.no_eta_reason)) fields.no_eta_reason = 'Explain why no ETA can be committed.';
-        if (!str(body.checkpoint)) fields.checkpoint = 'Set the next checkpoint.';
+        else if (str(body.no_eta_reason).length < 5) {
+          fields.no_eta_reason = 'Use at least 5 characters.';
+        }
+        if (!str(body.next_checkpoint_at)) fields.next_checkpoint_at = 'Set the next checkpoint.';
+        else checkpointIso = new Date(futureMs(body.next_checkpoint_at, 'next_checkpoint_at')).toISOString();
         if (Object.keys(fields).length > 0) throw422(fields);
       }
 
@@ -57,6 +63,7 @@ export const ticketActionHandlers = [
       if (!t.owner) t.owner = actorRef(user);
       t.status = t.assignee ? 'assigned' : 'acknowledged';
       t.eta = etaIso;
+      t.next_checkpoint_at = checkpointIso;
       rec.eta_shift = 0;
       rec.resp_due = null; // initial response met
       rec.update_due = now + db.policy.update_cadence_hours * HOUR_MS;
@@ -66,7 +73,7 @@ export const ticketActionHandlers = [
 
       const detail = etaIso
         ? `Owner ${t.owner?.name ?? user.name}, ETA ${fmtWhen(etaIso)}`
-        : `Owner ${t.owner?.name ?? user.name}, no ETA — ${str(body.no_eta_reason)} (checkpoint ${fmtWhen(body.checkpoint)})`;
+        : `Owner ${t.owner?.name ?? user.name}, no ETA — ${str(body.no_eta_reason)} (checkpoint ${fmtWhen(checkpointIso)})`;
       pushEvent(rec, {
         actor: actorRef(user),
         type: 'audit',

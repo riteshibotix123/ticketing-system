@@ -23,6 +23,7 @@ const FORM_ACTIONS: TicketAction[] = [
   'revise_eta',
   'start_work',
   'ask_requester',
+  'resume',
   'hold',
   'resolve',
   'confirm_closure',
@@ -38,11 +39,14 @@ const ACTION_LABEL: Record<TicketAction, string> = {
   revise_eta: 'Revise ETA',
   start_work: 'Start work',
   ask_requester: 'Ask requester',
+  resume: 'Resume work',
   hold: 'Put on hold',
   resolve: 'Resolve',
   confirm_closure: 'Confirm closure',
   reopen: 'Reopen',
   cancel: 'Cancel',
+  close_admin: 'Close ticket',
+  manage_collaborators: 'Manage collaborators',
   comment: 'Comment',
   internal_note: 'Internal note',
 };
@@ -82,6 +86,7 @@ export function TicketActionPanel({ ticket }: { ticket: Ticket }) {
         return <ReviseEtaForm ticket={ticket} onDone={done} />;
       case 'start_work':
       case 'ask_requester':
+      case 'resume':
         return <StatusForm ticket={ticket} action={open} onDone={done} />;
       case 'hold':
         return <HoldForm ticket={ticket} onDone={done} />;

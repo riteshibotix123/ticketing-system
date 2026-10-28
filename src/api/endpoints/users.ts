@@ -1,38 +1,77 @@
-import { api, apiFetch } from '../client';
-import type { Me, Paged, Role, SignupRequest, User } from '@/types/domain';
+import { api } from '../client';
+import type {
+  AccountState,
+  Paged,
+  ProtectedAction,
+  ProtectedActionKind,
+  ProtectedActionStatus,
+  Role,
+  SignupRequest,
+  SignupStatus,
+  UserListItem,
+  UserRef,
+} from '@/types/domain';
 
 export interface UserListParams {
   q?: string;
-  role?: string;
-  state?: string;
+  role?: Role;
+  state?: AccountState;
   department_id?: string;
   page?: number;
   page_size?: number;
 }
 
-export interface RoleUpdatePayload {
-  add?: Role[];
-  remove?: Role[];
-  department_ids?: string[];
-  confidential_departments?: string[];
+export interface SignupRequestListParams {
+  status?: SignupStatus;
+  page?: number;
+  page_size?: number;
+}
+
+export interface SpokeDepartmentsPayload {
+  spoke_departments: string[];
+  reason: string;
+}
+
+export interface DeactivateResult {
+  result: 'deactivated' | 'protected_request_created';
+  open_ticket_count: number;
+  protected_action_id: string | null;
+}
+
+export interface ProtectedActionListParams {
+  status?: ProtectedActionStatus;
+  page?: number;
+}
+
+export interface CreateProtectedActionPayload {
+  kind: ProtectedActionKind;
+  target_user_id: string;
   reason: string;
 }
 
 export const usersApi = {
-  list: (params: UserListParams) => api.get<Paged<User>>('/users', { ...params }),
+  list: (params: UserListParams) => api.get<Paged<UserListItem>>('/users', { ...params }),
 
-  updateRoles: (id: string, payload: RoleUpdatePayload) =>
-    api.patch<User>(`/users/${id}/roles`, payload),
+  lookup: (q: string) => api.get<UserRef[]>('/users/lookup', { q }),
 
-  deactivate: (id: string, reason: string) => api.post<User>(`/users/${id}/deactivate`, { reason }),
+  updateRoles: (id: string, payload: SpokeDepartmentsPayload) =>
+    api.patch<UserListItem>(`/users/${id}/roles`, payload),
 
-  activate: (id: string, reason: string) => api.post<User>(`/users/${id}/activate`, { reason }),
+  deactivate: (id: string, reason: string) =>
+    api.post<DeactivateResult>(`/users/${id}/deactivate`, { reason }),
 
-  signupRequests: (status?: string) =>
-    api.get<Paged<SignupRequest>>('/signup-requests', { status, page_size: 100 }),
+  activate: (id: string) => api.post<UserListItem>(`/users/${id}/activate`),
 
-  pendingCount: () =>
-    api.get<{ count: number }>('/signup-requests', { status: 'pending', count_only: true }),
+  signupRequests: (params: SignupRequestListParams = {}) =>
+    api.get<Paged<SignupRequest>>('/signup-requests', { ...params }),
+
+  pendingSignupCount: async () => {
+    const page = await api.get<Paged<SignupRequest>>('/signup-requests', {
+      status: 'pending',
+      page_size: 1,
+    });
+    return page.total;
+  },
 
   approve: (id: string, payload: { approved_role: Role; approved_department: string }) =>
     api.post<SignupRequest>(`/signup-requests/${id}/approve`, payload),
@@ -40,19 +79,21 @@ export const usersApi = {
   reject: (id: string, reason: string) =>
     api.post<SignupRequest>(`/signup-requests/${id}/reject`, { reason }),
 
-  admins: () => api.get<Paged<User>>('/admins', { page_size: 100 }),
+  admins: () => api.get<UserListItem[]>('/admins'),
 
-  createAdmin: (payload: { email: string; name: string }) => api.post<User>('/admins', payload),
+  createAdmin: (user_id: string) => api.post<UserListItem>('/admins', { user_id }),
 
-  // Rule 10/14: account changes carry a reason and are audit logged server-side.
-  deactivateAdmin: (id: string, reason?: string) =>
-    api.post<User>(`/admins/${id}/deactivate`, { reason }),
+  removeAdmin: (user_id: string) => api.del<UserListItem>(`/admins/${user_id}`),
 
-  activateAdmin: (id: string, reason?: string) =>
-    api.post<User>(`/admins/${id}/activate`, { reason }),
+  protectedActions: (params: ProtectedActionListParams = {}) =>
+    api.get<Paged<ProtectedAction>>('/protected-actions', { ...params }),
 
-  removeAdmin: (id: string, reason?: string) =>
-    apiFetch<{ status: string }>(`/admins/${id}`, { method: 'DELETE', body: { reason } }),
+  createProtectedAction: (payload: CreateProtectedActionPayload) =>
+    api.post<ProtectedAction>('/protected-actions', payload),
+
+  approveProtectedAction: (id: string) =>
+    api.post<ProtectedAction>(`/protected-actions/${id}/approve`),
+
+  rejectProtectedAction: (id: string, reason: string) =>
+    api.post<ProtectedAction>(`/protected-actions/${id}/reject`, { reason }),
 };
-
-export type { Me };

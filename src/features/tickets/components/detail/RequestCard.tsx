@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -8,6 +9,8 @@ import {
 } from 'lucide-react';
 import { formatBytes } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
+import { errorMessage } from '@/api/client';
+import { ticketsApi } from '@/api/endpoints/tickets';
 import type { Attachment, Ticket } from '@/types/domain';
 
 const SCAN_META: Record<
@@ -21,6 +24,27 @@ const SCAN_META: Record<
 
 /** Spec 9.6 card 1: description plus attachments with scan status and download. */
 export function RequestCard({ ticket }: { ticket: Ticket }) {
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const download = async (attachment: Attachment) => {
+    setDownloading(attachment.id);
+    setDownloadError(null);
+    try {
+      const blob = await ticketsApi.downloadAttachment(attachment.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.name;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(errorMessage(err));
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   return (
     <section className="card p-4">
       <h2 className="text-section-title text-fg">Request</h2>
@@ -49,20 +73,26 @@ export function RequestCard({ ticket }: { ticket: Ticket }) {
                     <ScanIcon className="h-3 w-3" aria-hidden="true" />
                     {scan.label}
                   </Badge>
-                  {att.url ? (
-                    <a
-                      href={att.url}
-                      download
-                      className="inline-flex items-center gap-1 font-medium text-accent underline-offset-4 hover:underline"
+                  {att.scan_status === 'clean' ? (
+                    <button
+                      type="button"
+                      onClick={() => void download(att)}
+                      disabled={downloading === att.id}
+                      className="inline-flex items-center gap-1 font-medium text-accent underline-offset-4 hover:underline disabled:opacity-60"
                     >
                       <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                      Download
-                    </a>
+                      {downloading === att.id ? 'Downloading…' : 'Download'}
+                    </button>
                   ) : null}
                 </li>
               );
             })}
           </ul>
+          {downloadError ? (
+            <p role="alert" className="mt-2 text-small text-crit">
+              {downloadError}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </section>

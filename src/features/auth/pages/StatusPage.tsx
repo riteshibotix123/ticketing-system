@@ -4,7 +4,7 @@ import { FullPageSkeleton } from '@/components/ui/skeleton';
 import { AuthShell } from '@/features/auth/components/AuthShell';
 import { ResendButton } from '@/features/auth/components/ResendButton';
 import { useAuth } from '@/hooks/useAuth';
-import type { MeResponse } from '@/api/endpoints/auth';
+import type { Me } from '@/types/domain';
 import { ROLE_LABEL } from '@/lib/constants';
 import type { Role } from '@/types/domain';
 
@@ -22,7 +22,7 @@ interface PendingRequestFields {
   requested_department?: string;
 }
 
-function readPendingRequest(me: MeResponse | null): PendingRequestFields {
+function readPendingRequest(me: Me | null): PendingRequestFields {
   return (me ?? {}) as unknown as PendingRequestFields;
 }
 
@@ -146,3 +146,4 @@ export default function StatusPage() {
       );
   }
 }
+

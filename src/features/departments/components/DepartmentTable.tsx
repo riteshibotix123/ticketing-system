@@ -10,13 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ConfidentialBadge } from '@/components/common/ConfidentialBadge';
 import { CategoryManager } from './CategoryManager';
 import { EscalationSelects } from './EscalationSelects';
 import { SpokeManager } from './SpokeManager';
 import type { Department, UserRef } from '@/types/domain';
 
-const COLUMN_COUNT = 7;
+const COLUMN_COUNT = 6;
 
 /**
  * Departments table (spec 9.13): Spokes as chips, escalation contacts,
@@ -50,8 +49,7 @@ export function DepartmentTable({
           <TableRow className="hover:bg-transparent">
             <TableHead>Department</TableHead>
             <TableHead>Spokes</TableHead>
-            <TableHead className="min-w-[230px]">Escalation</TableHead>
-            <TableHead>Confidential</TableHead>
+            <TableHead className="min-w-[230px]">Escalation contact</TableHead>
             <TableHead>Active</TableHead>
             <TableHead>Categories</TableHead>
             <TableHead>
@@ -82,13 +80,6 @@ export function DepartmentTable({
                       candidates={escCandidates}
                       editable={editable}
                     />
-                  </TableCell>
-                  <TableCell>
-                    {department.confidential ? (
-                      <ConfidentialBadge />
-                    ) : (
-                      <span className="text-small text-muted">No</span>
-                    )}
                   </TableCell>
                   <TableCell>
                     {department.active ? (
@@ -138,11 +129,7 @@ export function DepartmentTable({
                 {expanded ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell colSpan={COLUMN_COUNT} className="bg-surface-2/60 px-4 py-3">
-                      <CategoryManager
-                        department={department}
-                        editable={editable}
-                        escalationOptions={escCandidates}
-                      />
+                      <CategoryManager department={department} editable={editable} />
                     </TableCell>
                   </TableRow>
                 ) : null}

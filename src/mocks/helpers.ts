@@ -9,7 +9,7 @@ import { db, findUser, ref, uid, type DbNotification, type DbTicket, type DbUser
 
 /* ------------------------------------------------------------------ errors */
 
-/** Throw-from-resolver error mapped to the documented error envelope. */
+/** Throw-from-handler error mapped to the documented error envelope. */
 export class ApiFailure extends Error {
   readonly status: number;
   readonly code: string;
@@ -71,7 +71,7 @@ function corsHeaders(request?: Request): Record<string, string> {
 
 /**
  * Handler responses: the DOM `Response` MSW's HttpResponse extends, which is
- * what its resolver return union accepts for any body type.
+ * what its handler return union accepts for any body type.
  */
 type AnyResponse = Response;
 

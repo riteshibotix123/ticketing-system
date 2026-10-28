@@ -10,10 +10,10 @@ import {
 import { useDebounce } from '@/hooks/useDebounce';
 import type { useUrlFilters } from '@/hooks/useUrlFilters';
 import { ACCOUNT_STATE_LABEL, ROLE_LABEL } from '@/lib/constants';
-import type { Department } from '@/types/domain';
+import type { Department, Role } from '@/types/domain';
 
 const ANY = 'any';
-const ROLE_FILTERS = ['employee', 'spoke', 'resolver', 'admin', 'super_admin'] as const;
+const ROLE_FILTERS: Role[] = ['employee', 'spoke', 'admin', 'super_admin'];
 const STATE_FILTERS = [
   'active',
   'pending_approval',

@@ -6,7 +6,7 @@
  */
 import { db, findUser, findUserByEmail, uid, type DbUser } from './db';
 import { meFor } from './access';
-import type { Role, User } from '@/types/domain';
+import type { AccountState, Role } from '@/types/domain';
 
 export const DEMO_PASSWORD = 'IbotixDemo@2026';
 export const MFA_DEMO_CODE = '123456';
@@ -78,6 +78,7 @@ export function login(email: string, password: string): LoginOutcome {
     db.tokens[mfaToken] = { user_id: user.id, kind: 'mfa' };
     return { kind: 'mfa', mfa_token: mfaToken };
   }
+  user.last_login_at = new Date().toISOString();
   return {
     kind: 'ok',
     access_token: issueToken(user.id, 'access'),
@@ -117,6 +118,7 @@ export function verifyMfa(mfaToken: string, code: string): MfaOutcome {
   delete db.tokens[mfaToken];
   const user = findUser(record.user_id);
   if (!user) return { kind: 'invalid_token' };
+  user.last_login_at = new Date().toISOString();
   return {
     kind: 'ok',
     access_token: issueToken(user.id, 'access'),
@@ -170,9 +172,9 @@ export function createSignup(input: {
     department_id: input.requested_department,
     state: 'pending_verification',
     spoke_departments: [],
-    confidential_departments: [],
     mfa_enabled: false,
     created_at: new Date().toISOString(),
+    last_login_at: null,
     password: input.password,
   };
   db.users.push(user);
@@ -185,6 +187,7 @@ export function createSignup(input: {
     requested_role: role as 'employee' | 'admin' | 'super_admin',
     requested_department: input.requested_department,
     status: 'pending',
+    can_approve: false,
     created_at: new Date().toISOString(),
   });
   db.verifyTokens[`verify-${user.id}-${Math.random().toString(36).slice(2, 8)}`] = user.id;
@@ -232,7 +235,7 @@ export interface Persona {
   email: string;
   title?: string;
   roles: Role[];
-  state: User['state'];
+  state: AccountState;
 }
 
 export function personas(): Persona[] {
@@ -252,5 +255,6 @@ export function personaLogin(
 ): { access_token: string; me: ReturnType<typeof meFor> } | null {
   const user = findUserByEmail(email);
   if (!user) return null;
+  user.last_login_at = new Date().toISOString();
   return { access_token: issueToken(user.id, 'access'), me: meFor(user) };
 }

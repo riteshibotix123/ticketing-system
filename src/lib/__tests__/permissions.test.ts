@@ -89,7 +89,7 @@ describe('approval rules (spec 1.3 / 10.12)', () => {
   });
 
   it('lists only grantable roles', () => {
-    expect(grantableRoles(admin)).toEqual(['employee', 'spoke', 'resolver']);
+    expect(grantableRoles(admin)).toEqual(['employee']);
     expect(grantableRoles(superAdmin)).toContain('super_admin');
     expect(grantableRoles(spoke)).toEqual([]);
   });

@@ -1,19 +1,33 @@
 import { api, apiFetch } from '../client';
-import type { AccountState, Me, PublicConfig, Role } from '@/types/domain';
+import type { Me, PublicConfig } from '@/types/domain';
 
-export interface LoginResponse {
-  access_token?: string;
-  token_type?: string;
-  mfa_required?: boolean;
-  mfa_token?: string;
+export interface LoginSuccess {
+  access_token: string;
+  expires_in: number;
+  user: Me;
 }
 
-export interface MeResponse extends Me {
-  account_state?: AccountState;
+export type LoginResult =
+  | LoginSuccess
+  | { mfa_required: true; mfa_token: string }
+  | { mfa_enrol_required: true; mfa_token: string };
+
+export interface MfaSetupResult {
+  secret: string;
+  otpauth_uri: string;
 }
+
+export type MfaConfirmResult = LoginSuccess & { recovery_codes: string[] };
 
 export interface SignupPayload {
   name: string;
+  email: string;
+  password: string;
+  requested_role: 'employee' | 'admin' | 'super_admin';
+  requested_department: string;
+}
+
+export interface ReapplyPayload {
   email: string;
   password: string;
   requested_role: 'employee' | 'admin' | 'super_admin';
@@ -24,61 +38,84 @@ export const authApi = {
   publicConfig: () => api.get<PublicConfig>('/public/config'),
 
   signup: (payload: SignupPayload) =>
-    apiFetch<{ status: string; dev_token?: string }>('/auth/signup', {
+    apiFetch<{ message: string }>('/auth/signup', {
       method: 'POST',
       body: payload,
       noRetry: true,
     }),
 
   verifyEmail: (token: string) =>
-    apiFetch<{ status: string }>('/auth/verify-email', {
+    apiFetch<{ state: 'pending_approval' }>('/auth/verify-email', {
       method: 'POST',
       body: { token },
       noRetry: true,
     }),
 
   resendVerification: (email: string) =>
-    apiFetch<{ status: string }>('/auth/resend-verification', {
+    apiFetch<void>('/auth/resend-verification', {
       method: 'POST',
       body: { email },
       noRetry: true,
     }),
 
+  reapply: (payload: ReapplyPayload) =>
+    apiFetch<void>('/auth/reapply', {
+      method: 'POST',
+      body: payload,
+      noRetry: true,
+    }),
+
   login: (email: string, password: string) =>
-    apiFetch<LoginResponse>('/auth/login', {
+    apiFetch<LoginResult>('/auth/login', {
       method: 'POST',
       body: { email, password },
       noRetry: true,
     }),
 
-  mfaVerify: (mfa_token: string, code: string) =>
-    apiFetch<LoginResponse>('/auth/mfa/verify', {
+  mfaSetup: (mfa_token: string) =>
+    apiFetch<MfaSetupResult>('/auth/mfa/setup', {
+      method: 'POST',
+      body: { mfa_token },
+      noRetry: true,
+    }),
+
+  mfaConfirm: (mfa_token: string, code: string) =>
+    apiFetch<MfaConfirmResult>('/auth/mfa/confirm', {
       method: 'POST',
       body: { mfa_token, code },
+      noRetry: true,
+    }),
+
+  mfaVerify: (mfa_token: string, code: string) =>
+    apiFetch<LoginSuccess>('/auth/mfa/verify', {
+      method: 'POST',
+      body: { mfa_token, code },
+      noRetry: true,
+    }),
+
+  refresh: () =>
+    apiFetch<{ access_token: string; expires_in: number }>('/auth/refresh', {
+      method: 'POST',
       noRetry: true,
     }),
 
   logout: () => api.post<void>('/auth/logout'),
 
   forgotPassword: (email: string) =>
-    apiFetch<{ status: string }>('/auth/forgot-password', {
+    apiFetch<void>('/auth/forgot-password', {
       method: 'POST',
       body: { email },
       noRetry: true,
     }),
 
   resetPassword: (token: string, password: string) =>
-    apiFetch<{ status: string }>('/auth/reset-password', {
+    apiFetch<void>('/auth/reset-password', {
       method: 'POST',
       body: { token, password },
       noRetry: true,
     }),
 
-  /** Initial session probe: a 401 here just means "not signed in". */
-  me: () => apiFetch<MeResponse>('/auth/me', { method: 'GET', noRetry: true }),
+  me: () => apiFetch<Me>('/auth/me', { method: 'GET', noRetry: true }),
 
-  setTheme: (theme: 'system' | 'light' | 'dark') =>
-    api.patch<{ status: string }>('/auth/me', { theme }),
+  setTheme: (theme: 'system' | 'light' | 'dark') => api.patch<Me>('/auth/me', { theme }),
 };
-
-export type { Role };

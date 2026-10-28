@@ -10,16 +10,31 @@ import { personas } from '../auth';
 import { p } from './paths';
 
 export const PUBLIC_CONFIG: PublicConfig = {
-  app_name: 'Ibotix Tickets',
   allowed_email_domains: ['ibotix.ai'],
-  max_attachment_bytes: 5_242_880, // 5 MB
-  allowed_attachment_mimes: ['application/pdf', 'image/png', 'image/jpeg', 'text/plain'],
-  personas_enabled: true,
-  demo_clock_enabled: true,
+  departments: [],
+  attachment_limits: {
+    max_bytes: 5_242_880,
+    max_files: 5,
+    allowed_mime_types: ['application/pdf', 'image/png', 'image/jpeg', 'text/plain'],
+  },
+  password_min_length: 12,
+  first_response_hours: 24,
 };
 
 const configHandler: HttpResponseResolver = ({ request }) =>
-  respond(request, () => ok(PUBLIC_CONFIG, request));
+  respond(request, () =>
+    ok(
+      {
+        ...PUBLIC_CONFIG,
+        departments: db.departments.map((department) => ({
+          id: department.id,
+          name: department.name,
+        })),
+        first_response_hours: db.policy.initial_response_hours,
+      },
+      request,
+    ),
+  );
 
 const devPersonasHandler: HttpResponseResolver = ({ request }) =>
   respond(request, () =>

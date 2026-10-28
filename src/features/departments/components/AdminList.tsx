@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/useToast';
 import { orderedRoles } from '@/lib/permissions';
 import { reasonSchema } from '@/lib/zod-schemas';
 import { StatePill } from './StatePill';
-import type { User } from '@/types/domain';
+import type { UserListItem } from '@/types/domain';
 
 type AdminActionKind = 'deactivate' | 'activate' | 'remove';
 
@@ -44,10 +44,10 @@ const CONFIRM_COPY: Record<
  * Admin accounts list with Super Admin actions (spec 9.13 + rule 14).
  * Every action is confirmed in-page with a reason — never window.confirm.
  */
-export function AdminList({ admins }: { admins: User[] }) {
+export function AdminList({ admins }: { admins: UserListItem[] }) {
   const { success } = useToast();
   const qc = useQueryClient();
-  const [pending, setPending] = useState<{ kind: AdminActionKind; user: User } | null>(null);
+  const [pending, setPending] = useState<{ kind: AdminActionKind; user: UserListItem } | null>(null);
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState<string | null>(null);
 
@@ -59,22 +59,27 @@ export function AdminList({ admins }: { admins: User[] }) {
   };
 
   const actionMutation = useMutation({
-    mutationFn: ({ kind, user }: { kind: AdminActionKind; user: User }): Promise<unknown> => {
+    mutationFn: ({ kind, user }: { kind: AdminActionKind; user: UserListItem }): Promise<unknown> => {
       // Rule 10/14: every account change carries the confirmed reason so the
       // server can audit it.
       const trimmed = reason.trim();
-      if (kind === 'deactivate') return usersApi.deactivateAdmin(user.id, trimmed);
-      if (kind === 'activate') return usersApi.activateAdmin(user.id, trimmed);
-      return usersApi.removeAdmin(user.id, trimmed);
+      if (kind === 'deactivate') return usersApi.deactivate(user.id, trimmed);
+      if (kind === 'activate') return usersApi.activate(user.id);
+      return usersApi.removeAdmin(user.id);
     },
-    onSuccess: (_data, vars) => {
-      success(ACTION_TOAST[vars.kind]);
+    onSuccess: (data, vars) => {
+      const result = data as { result?: string } | null;
+      success(
+        result?.result === 'protected_request_created'
+          ? 'Sent for second Super Admin approval.'
+          : ACTION_TOAST[vars.kind],
+      );
       void qc.invalidateQueries({ queryKey: queryKeys.admins });
       close();
     },
   });
 
-  const open = (kind: AdminActionKind, user: User) => {
+  const open = (kind: AdminActionKind, user: UserListItem) => {
     actionMutation.reset();
     setReason('');
     setReasonError(null);
@@ -82,11 +87,14 @@ export function AdminList({ admins }: { admins: User[] }) {
   };
 
   const confirm = () => {
-    const parsed = reasonSchema.safeParse({ reason: reason.trim() });
-    if (!parsed.success) {
-      setReasonError('Required.');
-      return;
+    if (pending?.kind === 'deactivate') {
+      const parsed = reasonSchema.safeParse({ reason: reason.trim() });
+      if (!parsed.success) {
+        setReasonError('Required.');
+        return;
+      }
     }
+    setReasonError(null);
     if (pending) actionMutation.mutate(pending);
   };
 

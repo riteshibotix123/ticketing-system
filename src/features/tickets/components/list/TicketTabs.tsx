@@ -7,14 +7,10 @@ export interface TicketTabOption {
   label: string;
 }
 
-/**
- * Default tab per spec 9.4: Admin+ -> All, Spoke -> Queue,
- * Resolver -> Assigned, else Mine.
- */
+/** Default tab per spec 9.4: Admin+ -> All, Spoke -> Queue, else Mine. */
 export function defaultTicketTab(primaryRole: Role | null, canViewAll: boolean): TicketTabId {
   if (canViewAll) return 'all';
   if (primaryRole === 'spoke') return 'queue';
-  if (primaryRole === 'resolver') return 'assigned';
   return 'mine';
 }
 

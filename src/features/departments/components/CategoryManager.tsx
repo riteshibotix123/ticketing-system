@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { errorMessage } from '@/api/client';
@@ -6,28 +6,24 @@ import { departmentsApi } from '@/api/endpoints/departments';
 import { queryKeys } from '@/api/queryKeys';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/useToast';
 import { CategoryRow } from './CategoryRow';
-import type { Category, Department, UserRef } from '@/types/domain';
+import type { Category, Department } from '@/types/domain';
 
-/**
- * Inline expandable category list: add, rename, remove, and an optional
- * per-category escalation override (spec 9.13).
- */
 export function CategoryManager({
   department,
   editable,
-  escalationOptions,
 }: {
   department: Department;
   editable: boolean;
-  /** Candidates for the per-category escalation override. */
-  escalationOptions: UserRef[];
 }) {
   const { success, error: errorToast } = useToast();
   const qc = useQueryClient();
+  const confidentialId = useId();
   const [draft, setDraft] = useState('');
+  const [confidential, setConfidential] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -41,25 +37,23 @@ export function CategoryManager({
   };
 
   const addMutation = useMutation({
-    mutationFn: (name: string) => departmentsApi.addCategory(department.id, name),
+    mutationFn: (payload: { name: string; confidential: boolean }) =>
+      departmentsApi.addCategory(department.id, payload),
     onSuccess: () => {
       success('Category added.');
       invalidate();
       setDraft('');
+      setConfidential(false);
       setServerError(null);
     },
     onError: fail,
   });
 
   const updateMutation = useMutation({
-    mutationFn: (updates: {
-      category: Category;
-      name?: string;
-      escalation_override_id?: string | null;
-    }) =>
+    mutationFn: (updates: { category: Category; name?: string; confidential?: boolean }) =>
       departmentsApi.updateCategory(updates.category.id, {
         name: updates.name,
-        escalation_override_id: updates.escalation_override_id,
+        confidential: updates.confidential,
       }),
     onSuccess: () => {
       success('Category updated.');
@@ -98,7 +92,6 @@ export function CategoryManager({
               key={category.id}
               category={category}
               editable={editable}
-              escalationOptions={escalationOptions}
               busy={busy}
               onSave={(updates) => updateMutation.mutate({ category, ...updates })}
               onDelete={() => setPendingDelete(category)}
@@ -109,12 +102,12 @@ export function CategoryManager({
 
       {editable ? (
         <form
-          className="flex flex-wrap items-center gap-2"
+          className="flex flex-wrap items-center gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             const name = draft.trim();
             if (name.length < 2) return;
-            addMutation.mutate(name);
+            addMutation.mutate({ name, confidential });
           }}
         >
           <label className="sr-only" htmlFor={`new-category-${department.id}`}>
@@ -129,6 +122,16 @@ export function CategoryManager({
             className="h-8 max-w-[240px]"
             aria-invalid={nameTooShort || undefined}
           />
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={confidentialId}
+              checked={confidential}
+              onCheckedChange={(value) => setConfidential(value === true)}
+            />
+            <label htmlFor={confidentialId} className="text-small text-fg">
+              Confidential
+            </label>
+          </div>
           <Button
             type="submit"
             size="sm"

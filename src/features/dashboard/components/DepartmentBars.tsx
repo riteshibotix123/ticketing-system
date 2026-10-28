@@ -11,7 +11,7 @@ import {
 import { cn } from '@/lib/cn';
 import type { AdminDashboard } from '@/types/domain';
 
-type DeptRow = AdminDashboard['by_department'][number];
+type DeptRow = NonNullable<AdminDashboard['by_department']>[number];
 
 const LEGEND = [
   { key: 'on_track', label: 'On track', swatch: 'bg-ok' },

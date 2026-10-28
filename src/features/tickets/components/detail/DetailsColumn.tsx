@@ -74,8 +74,8 @@ export function DetailsColumn({
           )}
         </DetailRow>
         {isStaff ? (
-          <DetailRow label="Escalation contact" muted={!department?.escalation_primary}>
-            {department?.escalation_primary?.name ?? 'Not set'}
+          <DetailRow label="Escalation contact" muted={!department?.escalation_contact}>
+            {department?.escalation_contact?.name ?? 'Not set'}
           </DetailRow>
         ) : null}
         <DetailRow label="Collaborators" muted={ticket.collaborators.length === 0}>

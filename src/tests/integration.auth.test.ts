@@ -23,22 +23,23 @@ describe('auth and session (spec 7/15)', () => {
     await loginAs(ASHA);
     const me = await authApi.me();
     expect(me.email).toBe(ASHA);
-    expect(me.account_state).toBe('active');
+    expect(me.roles).toContain('employee');
     expect(me.permissions).not.toContain('tickets.internal_notes');
   });
 
   it('walks the MFA step for staff accounts', async () => {
     const res = await authApi.login(ROHAN, PASSWORD);
+    if (!('mfa_required' in res)) throw new Error('Expected the MFA step.');
     expect(res.mfa_required).toBe(true);
     expect(res.mfa_token).toBeTruthy();
 
-    await expect(authApi.mfaVerify(res.mfa_token!, '000000')).rejects.toMatchObject({
+    await expect(authApi.mfaVerify(res.mfa_token, '000000')).rejects.toMatchObject({
       status: 422,
       fields: { code: expect.any(String) },
     });
 
-    const mfa = await authApi.mfaVerify(res.mfa_token!, MFA_CODE);
-    setAccessToken(mfa.access_token ?? null);
+    const mfa = await authApi.mfaVerify(res.mfa_token, MFA_CODE);
+    setAccessToken(mfa.access_token);
     const me = await authApi.me();
     expect(me.roles).toContain('spoke');
     expect(me.permissions).toContain('tickets.internal_notes');
@@ -69,7 +70,7 @@ describe('auth and session (spec 7/15)', () => {
 
 /** Find a pending signup request by email (Admin view). */
 async function pendingIdFor(email: string): Promise<string> {
-  const page = await usersApi.signupRequests('pending');
+  const page = await usersApi.signupRequests({ status: 'pending' });
   const found = page.items.find((r) => r.email.toLowerCase() === email.toLowerCase());
   if (!found) throw new Error(`No pending signup request for ${email}`);
   return found.id;
@@ -77,25 +78,24 @@ async function pendingIdFor(email: string): Promise<string> {
 
 async function signup(requestedRole: 'employee' | 'admin' | 'super_admin'): Promise<string> {
   const email = uniqueEmail();
-  const res = await authApi.signup({
+  await authApi.signup({
     name: 'Integration Tester',
     email,
     password: PASSWORD,
     requested_role: requestedRole,
     requested_department: 'IT',
   });
-  await authApi.verifyEmail(res.dev_token ?? 'mock-verify-token');
+  await authApi.verifyEmail('mock-verify-token');
   return email;
 }
 
 describe('signup and approval (spec 1.3.1/15)', () => {
   beforeEach(() => setAccessToken(null));
 
-  it('signs up, verifies the email and lands in pending_approval', async () => {
+  it('signs up, verifies the email and has no roles yet', async () => {
     const email = await signup('employee');
     await loginAs(email);
     const me = await authApi.me();
-    expect(me.account_state).toBe('pending_approval');
     expect(me.roles).toEqual([]);
   });
 
@@ -132,8 +132,8 @@ describe('signup and approval (spec 1.3.1/15)', () => {
     await usersApi.approve(adminId, { approved_role: 'admin', approved_department: 'IT' });
     await loginAs(adminEmail);
     const me = await authApi.me();
-    expect(me.account_state).toBe('active');
     expect(me.roles).toContain('admin');
+    expect(me.permissions).toContain('users.approve_employee');
   });
 
   it('lets a Super Admin approve a Super Admin request', async () => {

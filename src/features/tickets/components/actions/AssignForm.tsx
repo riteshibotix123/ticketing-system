@@ -3,7 +3,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
 import { assignSchema, type AssignInput } from '@/lib/zod-schemas';
 import { departmentsApi } from '@/api/endpoints/departments';
-import { usersApi } from '@/api/endpoints/users';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -12,37 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Ticket, UserRef } from '@/types/domain';
+import type { Ticket } from '@/types/domain';
 import { ActionField, ActionFormShell, useActionSubmit } from './ActionFormShell';
-
-/**
- * Eligible delegates: the department's Spokes (via `departmentsApi.list`) plus
- * resolvers. ASSUMPTION: the `/users` directory may be unavailable in the first
- * backend slice, so it is attempted first and any failure falls back to the
- * department's Spokes and the ticket's collaborators (spec 9.7: resolvers of the
- * department plus the cross-functional pool).
- */
-async function loadAssignablePeople(ticket: Ticket): Promise<UserRef[]> {
-  let resolvers: UserRef[] = [];
-  try {
-    const page = await usersApi.list({ role: 'resolver', state: 'active', page_size: 100 });
-    resolvers = page.items.filter((u) => u.roles.includes('resolver'));
-  } catch {
-    resolvers = [];
-  }
-  let spokes: UserRef[] = [];
-  try {
-    const departments = await departmentsApi.list();
-    spokes = departments.find((d) => d.id === ticket.department_id)?.spokes ?? [];
-  } catch {
-    spokes = [];
-  }
-  const candidates =
-    resolvers.length > 0 ? [...spokes, ...resolvers] : [...spokes, ...ticket.collaborators];
-  const byId = new Map<string, UserRef>();
-  for (const person of candidates) byId.set(person.id, person);
-  return [...byId.values()];
-}
 
 /** Spec 9.7: person required, optional reason, "You keep supervisory access." */
 export function AssignForm({ ticket, onDone }: { ticket: Ticket; onDone: () => void }) {
@@ -60,7 +30,7 @@ export function AssignForm({ ticket, onDone }: { ticket: Ticket; onDone: () => v
 
   const peopleQuery = useQuery({
     queryKey: ['ticket-assignable', ticket.department_id],
-    queryFn: () => loadAssignablePeople(ticket),
+    queryFn: () => departmentsApi.members(ticket.department_id),
     staleTime: 60_000,
   });
   const people = peopleQuery.data ?? [];
@@ -84,7 +54,7 @@ export function AssignForm({ ticket, onDone }: { ticket: Ticket; onDone: () => v
   return (
     <ActionFormShell
       title="Delegate ticket"
-      description="Hand the ticket to a Spoke or resolver of the department."
+      description="Hand the ticket to an active member of this department."
       error={act.error}
       pending={act.pending}
       confirmLabel="Delegate"

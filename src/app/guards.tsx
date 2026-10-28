@@ -17,11 +17,6 @@ export function RequireAuth() {
   if (!me)
     return <Navigate to={`/login?next=${nextParam(location.pathname, location.search)}`} replace />;
 
-  if (me.account_state && me.account_state !== 'active') {
-    // Pending / rejected / deactivated never reach the app shell (spec 4.3).
-    return <Navigate to={`/status/${me.account_state}`} replace />;
-  }
-
   return <Outlet />;
 }
 
@@ -31,12 +26,6 @@ export function PublicOnly() {
   const location = useLocation();
 
   if (status === 'loading') return <FullPageSkeleton />;
-
-  // account_state is only present for non-active users (spec 6.1); presence-check
-  // first so an active session is never bounced to /status/undefined.
-  if (me && me.account_state != null && me.account_state !== 'active') {
-    return <Navigate to={`/status/${me.account_state}`} replace />;
-  }
 
   if (me) {
     const next = new URLSearchParams(location.search).get('next');

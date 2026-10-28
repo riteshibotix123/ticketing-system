@@ -26,11 +26,11 @@ function decidedAt(request: SignupRequest): number {
 export function DecidedList() {
   const approvedQuery = useQuery({
     queryKey: queryKeys.signupRequests({ status: 'approved' }),
-    queryFn: () => usersApi.signupRequests('approved'),
+    queryFn: () => usersApi.signupRequests({ status: 'approved' }),
   });
   const rejectedQuery = useQuery({
     queryKey: queryKeys.signupRequests({ status: 'rejected' }),
-    queryFn: () => usersApi.signupRequests('rejected'),
+    queryFn: () => usersApi.signupRequests({ status: 'rejected' }),
   });
 
   const rows = useMemo(() => {

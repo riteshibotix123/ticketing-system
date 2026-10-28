@@ -1,16 +1,18 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { authApi, type MeResponse } from '@/api/endpoints/auth';
+import { authApi } from '@/api/endpoints/auth';
+import type { Me } from '@/types/domain';
 import { setAccessToken, setSessionExpiredHandler } from '@/api/client';
 import { queryKeys } from '@/api/queryKeys';
 
 export interface AuthResult {
   mfaRequired: boolean;
   mfaToken?: string;
+  mfaEnrolRequired?: boolean;
 }
 
 interface AuthContextValue {
-  me: MeResponse | null;
+  me: Me | null;
   status: 'loading' | 'ready';
   /** True while the "Session expired" dialog is showing. */
   sessionExpired: boolean;
@@ -24,7 +26,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /** Install the access token, load /auth/me, and clear the token if that fails. */
-async function adoptSession(access_token: string | undefined): Promise<MeResponse> {
+async function adoptSession(access_token: string | undefined): Promise<Me> {
   setAccessToken(access_token ?? null);
   try {
     return await authApi.me();
@@ -35,7 +37,7 @@ async function adoptSession(access_token: string | undefined): Promise<MeRespons
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [me, setMe] = useState<MeResponse | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready'>('loading');
   const [sessionExpired, setSessionExpired] = useState(false);
   const queryClient = useQueryClient();
@@ -58,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void loadMe();
   }, [loadMe]);
 
-  // Refresh failure anywhere in the app → "Session expired" modal → /login.
+  // Refresh failure anywhere in the app â†’ "Session expired" modal â†’ /login.
   useEffect(() => {
     setSessionExpiredHandler(() => {
       setSessionExpired(true);
@@ -69,8 +71,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback<AuthContextValue['login']>(async (email, password) => {
     const res = await authApi.login(email, password);
-    if (res.mfa_required && res.mfa_token) {
+    if ('mfa_required' in res) {
       return { mfaRequired: true, mfaToken: res.mfa_token };
+    }
+    if ('mfa_enrol_required' in res) {
+      return { mfaRequired: true, mfaToken: res.mfa_token, mfaEnrolRequired: true };
     }
     // The token must be installed BEFORE /auth/me (spec 7), or the probe 401s.
     const next = await adoptSession(res.access_token);
@@ -122,3 +127,4 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
   return ctx;
 }
+

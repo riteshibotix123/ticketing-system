@@ -47,7 +47,7 @@ describe('AuthProvider (spec 7)', () => {
     });
 
     expect(result.current.me?.email).toBe(ASHA);
-    expect(result.current.me?.account_state).toBe('active');
+    expect(result.current.me?.permissions).toContain('tickets.create');
   });
 
   it('keeps the session after the MFA step', async () => {

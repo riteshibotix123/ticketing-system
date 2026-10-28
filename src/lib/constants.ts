@@ -55,7 +55,6 @@ export const ROLE_LABEL: Record<Role, string> = {
   super_admin: 'Super Admin',
   admin: 'Admin',
   spoke: 'Spoke',
-  resolver: 'Resolver',
   employee: 'Employee',
 };
 

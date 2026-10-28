@@ -197,6 +197,24 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   return payload as T;
 }
 
+export async function apiBlob(path: string, query?: RequestOptions['query']): Promise<Blob> {
+  const url = buildUrl(path, query);
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  const res = await fetch(url, { method: 'GET', headers, credentials: 'include' });
+  if (!res.ok) {
+    let payload: unknown = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+    throw parseErrorBody(res.status, payload);
+  }
+  return res.blob();
+}
+
 export const api = {
   get: <T>(path: string, query?: RequestOptions['query'], signal?: AbortSignal) =>
     apiFetch<T>(path, { method: 'GET', query, signal }),
@@ -204,6 +222,7 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PUT', body }),
   del: <T>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
+  blob: (path: string, query?: RequestOptions['query']) => apiBlob(path, query),
   upload: <T>(path: string, formData: FormData) => apiFetch<T>(path, { method: 'POST', formData }),
 };
 

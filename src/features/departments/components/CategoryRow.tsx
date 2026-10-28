@@ -1,35 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
-import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Check, Lock, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { UserSelect, mergeUserOptions } from './UserSelect';
-import type { Category, UserRef } from '@/types/domain';
+import type { Category } from '@/types/domain';
 
-/**
- * One category line: rename inline, optional escalation override select,
- * remove button (spec 9.13). Deletion confirmation lives in CategoryManager.
- */
 export function CategoryRow({
   category,
   editable,
-  escalationOptions,
   busy,
   onSave,
   onDelete,
 }: {
   category: Category;
   editable: boolean;
-  escalationOptions: UserRef[];
-  /** True while any category mutation for this department is pending. */
   busy: boolean;
-  onSave: (updates: { name?: string; escalation_override_id?: string | null }) => void;
+  onSave: (updates: { name?: string; confidential?: boolean }) => void;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(category.name);
   const inputRef = useRef<HTMLInputElement>(null);
+  const confidentialId = useId();
 
-  // Focus the rename input when editing starts (no autoFocus — jsx-a11y).
   useEffect(() => {
     if (editing) inputRef.current?.focus();
   }, [editing]);
@@ -45,8 +38,6 @@ export function CategoryRow({
     if (name.length < 2 || name === category.name) return;
     onSave({ name });
   };
-
-  const overrideId = category.escalation_override?.id ?? null;
 
   return (
     <li className="flex flex-wrap items-center gap-2 border-b border-line py-2 last:border-b-0">
@@ -94,20 +85,25 @@ export function CategoryRow({
         <span className="min-w-[120px] flex-1 text-body text-fg">{category.name}</span>
       )}
 
+      {category.confidential ? (
+        <span className="inline-flex items-center gap-1 text-small text-muted">
+          <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+          Confidential
+        </span>
+      ) : null}
+
       {editable ? (
         <>
-          <div className="flex items-center gap-1.5">
-            <span className="label-caps hidden text-muted sm:inline">Override</span>
-            <UserSelect
-              label={`Escalation override for ${category.name}`}
-              value={overrideId}
-              onChange={(id) => onSave({ escalation_override_id: id })}
-              options={mergeUserOptions(escalationOptions, [category.escalation_override])}
-              placeholder="No override"
-              allowClear
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={confidentialId}
+              checked={category.confidential}
+              onCheckedChange={(value) => onSave({ confidential: value === true })}
               disabled={busy}
-              className="w-[180px]"
             />
+            <label htmlFor={confidentialId} className="text-small text-fg">
+              Confidential
+            </label>
           </div>
           {!editing ? (
             <Button
@@ -130,13 +126,7 @@ export function CategoryRow({
             <Trash2 className="h-3.5 w-3.5 text-crit" aria-hidden="true" />
           </Button>
         </>
-      ) : (
-        <span className="text-small text-muted">
-          {category.escalation_override
-            ? `Override: ${category.escalation_override.name}`
-            : 'No override'}
-        </span>
-      )}
+      ) : null}
     </li>
   );
 }

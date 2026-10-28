@@ -33,7 +33,7 @@ import {
   type ApproveSignupInput,
   type RejectSignupInput,
 } from '@/lib/zod-schemas';
-import type { Role, SignupRequest } from '@/types/domain';
+import type { SignupRequest } from '@/types/domain';
 
 const fieldLabel = (id: string, text: string) => (
   <label htmlFor={id} className="text-small font-medium text-fg">
@@ -163,8 +163,8 @@ export function ReviewDialog({
     setRejecting(next === 'reject');
     setServerError(null);
   };
-  const onApprove = handleSubmit((input) => approveMutation.mutate(input));
-  const onReject = handleRejectSubmit((input) => rejectMutation.mutate(input));
+  const onApprove = handleSubmit((input: ApproveSignupInput) => approveMutation.mutate(input));
+  const onReject = handleRejectSubmit((input: RejectSignupInput) => rejectMutation.mutate(input));
 
   const requestedDepartmentLabel =
     departments?.find((d) => d.id === request.requested_department)?.name ??
@@ -197,7 +197,9 @@ export function ReviewDialog({
               <Select
                 value={watch('approved_role')}
                 onValueChange={(value) =>
-                  setValue('approved_role', value as Role, { shouldValidate: true })
+                  setValue('approved_role', value as ApproveSignupInput['approved_role'], {
+                    shouldValidate: true,
+                  })
                 }
               >
                 <SelectTrigger

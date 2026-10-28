@@ -1,5 +1,5 @@
-import { useId } from 'react';
-import { Controller, useForm, type SubmitErrorHandler } from 'react-hook-form';
+import { useId, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { acknowledgeSchema, type AcknowledgeInput } from '@/lib/zod-schemas';
 import { isoPlusHours, isoToLocalInput, localInputToIso } from '@/lib/format';
@@ -10,16 +10,11 @@ import { Textarea } from '@/components/ui/textarea';
 import type { Ticket } from '@/types/domain';
 import { ActionField, ActionFormShell, useActionSubmit } from './ActionFormShell';
 
-/**
- * Spec 9.7: acknowledge with an ETA (default now + 4h, must be future), or the
- * "cannot commit an ETA" mode with a reason and next checkpoint (rule 4).
- */
 export function AcknowledgeForm({ ticket, onDone }: { ticket: Ticket; onDone: () => void }) {
   const {
-    control,
     register,
     handleSubmit,
-    getValues,
+    setValue,
     setError,
     clearErrors,
     watch,
@@ -27,14 +22,14 @@ export function AcknowledgeForm({ ticket, onDone }: { ticket: Ticket; onDone: ()
   } = useForm<AcknowledgeInput>({
     resolver: zodResolver(acknowledgeSchema),
     defaultValues: {
-      use_eta: true,
       eta: isoToLocalInput(isoPlusHours(4)),
       no_eta_reason: '',
-      checkpoint: '',
+      next_checkpoint_at: '',
     },
   });
-  const useEta = watch('use_eta');
+  const [noEta, setNoEta] = useState(false);
   const modeId = useId();
+  const eta = watch('eta');
 
   const act = useActionSubmit({
     ticketId: ticket.id,
@@ -43,30 +38,13 @@ export function AcknowledgeForm({ ticket, onDone }: { ticket: Ticket; onDone: ()
     setError,
   });
 
-  // The schema reports the shared "one of the two" rule at `eta`; in no-ETA mode
-  // surface that message on the fields it actually applies to.
-  const onInvalid: SubmitErrorHandler<AcknowledgeInput> = (errs) => {
-    if (getValues('use_eta') || !errs.eta) return;
-    const message = errs.eta.message ?? 'Required.';
-    if (!getValues('no_eta_reason')?.trim()) setError('no_eta_reason', { type: 'server', message });
-    else if (!getValues('checkpoint')?.trim()) setError('checkpoint', { type: 'server', message });
-  };
-
   const onValid = async (values: AcknowledgeInput) => {
-    let body: TicketActionBody;
-    if (values.use_eta) {
-      body = { eta: localInputToIso(values.eta ?? '') };
-    } else {
-      // Whitespace-only values slip past the schema; block them here (rule 4).
-      const reason = values.no_eta_reason?.trim();
-      const checkpoint = values.checkpoint?.trim();
-      if (!reason || !checkpoint) {
-        if (!reason) setError('no_eta_reason', { type: 'validate', message: 'Required.' });
-        if (!checkpoint) setError('checkpoint', { type: 'validate', message: 'Required.' });
-        return;
-      }
-      body = { no_eta_reason: reason, checkpoint };
-    }
+    const body: TicketActionBody = noEta
+      ? {
+          no_eta_reason: values.no_eta_reason?.trim(),
+          next_checkpoint_at: localInputToIso(values.next_checkpoint_at ?? ''),
+        }
+      : { eta: localInputToIso(values.eta ?? '') };
     const ok = await act.submit(body);
     if (ok) onDone();
   };
@@ -79,27 +57,23 @@ export function AcknowledgeForm({ ticket, onDone }: { ticket: Ticket; onDone: ()
       pending={act.pending}
       confirmLabel="Acknowledge"
       onCancel={onDone}
-      onConfirm={handleSubmit(onValid, onInvalid)}
+      onConfirm={handleSubmit(onValid)}
     >
       <label htmlFor={modeId} className="flex items-center gap-2 text-body text-fg">
-        <Controller
-          control={control}
-          name="use_eta"
-          render={({ field }) => (
-            <Checkbox
-              id={modeId}
-              checked={field.value}
-              onCheckedChange={(checked) => {
-                field.onChange(checked === true);
-                clearErrors(['eta', 'no_eta_reason', 'checkpoint']);
-              }}
-            />
-          )}
+        <Checkbox
+          id={modeId}
+          checked={noEta}
+          onCheckedChange={(checked) => {
+            const next = checked === true;
+            setNoEta(next);
+            setValue('eta', next ? '' : isoToLocalInput(isoPlusHours(4)));
+            clearErrors(['eta', 'no_eta_reason', 'next_checkpoint_at']);
+          }}
         />
         I cannot commit an ETA yet
       </label>
 
-      {useEta ? (
+      {!noEta ? (
         <ActionField
           label="ETA"
           required
@@ -134,21 +108,23 @@ export function AcknowledgeForm({ ticket, onDone }: { ticket: Ticket; onDone: ()
           <ActionField
             label="Next checkpoint"
             required
-            error={errors.checkpoint?.message}
+            error={errors.next_checkpoint_at?.message}
             hint="When you will next update the requester."
             render={(f) => (
               <Input
                 id={f.id}
-                type="text"
-                placeholder="e.g. After the vendor replies"
+                type="datetime-local"
                 aria-invalid={f.invalid}
                 aria-describedby={f.describedBy}
-                {...register('checkpoint')}
+                {...register('next_checkpoint_at')}
               />
             )}
           />
         </>
       )}
+      {eta === '' && !noEta ? (
+        <p className="text-small text-muted">Pick an ETA or choose the no-ETA option.</p>
+      ) : null}
     </ActionFormShell>
   );
 }

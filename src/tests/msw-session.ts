@@ -22,12 +22,15 @@ export const KARAN = 'karan.shah@ibotix.ai'; // Super Admin
 /** Sign in (walking the MFA step when required) and install the token. */
 export async function loginAs(email: string): Promise<void> {
   const res = await authApi.login(email, PASSWORD);
-  if (res.mfa_required && res.mfa_token) {
+  if ('mfa_required' in res) {
     const mfa = await authApi.mfaVerify(res.mfa_token, MFA_CODE);
-    setAccessToken(mfa.access_token ?? null);
+    setAccessToken(mfa.access_token);
     return;
   }
-  setAccessToken(res.access_token ?? null);
+  if ('mfa_enrol_required' in res) {
+    throw new Error('MFA enrolment is not supported by this helper.');
+  }
+  setAccessToken(res.access_token);
 }
 
 let uniq = 0;

@@ -1,12 +1,8 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
-import { errorMessage, isApiError } from '@/api/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { errorMessage } from '@/api/client';
 import { usersApi } from '@/api/endpoints/users';
 import { queryKeys } from '@/api/queryKeys';
-import { FormField } from '@/components/common/FormField';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,16 +13,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useToast } from '@/hooks/useToast';
-import { emailSchema } from '@/lib/zod-schemas';
+import { UserSelect } from './UserSelect';
 
-const addAdminSchema = z.object({
-  name: z.string().trim().min(2, 'Enter a name.').max(120, 'Too long.'),
-  email: emailSchema,
-});
-type AddAdminInput = z.infer<typeof addAdminSchema>;
-
-/** "Add Admin" dialog (spec 9.13): name + email → invitation. */
 export function AddAdminDialog({
   open,
   onOpenChange,
@@ -36,30 +26,29 @@ export function AddAdminDialog({
 }) {
   const { success } = useToast();
   const qc = useQueryClient();
+  const [query, setQuery] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const debounced = useDebounce(query, 300);
+  const canSearch = debounced.trim().length >= 2;
 
-  const { register, handleSubmit, setError, formState, reset } = useForm<AddAdminInput>({
-    resolver: zodResolver(addAdminSchema),
-    defaultValues: { name: '', email: '' },
+  const lookup = useQuery({
+    queryKey: ['users', 'lookup', debounced],
+    queryFn: () => usersApi.lookup(debounced),
+    enabled: canSearch,
   });
 
   const mutation = useMutation({
-    mutationFn: (values: AddAdminInput) => usersApi.createAdmin(values),
+    mutationFn: (id: string) => usersApi.createAdmin(id),
     onSuccess: () => {
-      success('Admin invitation sent.');
+      success('Admin added.');
       void qc.invalidateQueries({ queryKey: queryKeys.admins });
-      reset();
+      setQuery('');
+      setUserId(null);
       setServerError(null);
       onOpenChange(false);
     },
-    onError: (err) => {
-      setServerError(errorMessage(err));
-      if (isApiError(err) && err.fields) {
-        for (const [key, message] of Object.entries(err.fields)) {
-          if (key === 'name' || key === 'email') setError(key, { message });
-        }
-      }
-    },
+    onError: (err) => setServerError(errorMessage(err)),
   });
 
   return (
@@ -76,32 +65,42 @@ export function AddAdminDialog({
         <DialogHeader>
           <DialogTitle>Add Admin</DialogTitle>
           <DialogDescription>
-            An invitation email is sent. The account becomes an Admin after signup and approval.
+            Choose an active employee. Their account is promoted to Admin immediately.
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          onSubmit={handleSubmit((values) => mutation.mutate(values))}
-          className="flex flex-col gap-4"
-        >
-          <FormField label="Full name" required error={formState.errors.name?.message}>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="admin-lookup" className="text-small font-medium text-fg">
+              Find a person
+            </label>
             <Input
-              {...register('name')}
-              placeholder="e.g. Priya Nair"
-              maxLength={120}
+              id="admin-lookup"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setUserId(null);
+              }}
+              placeholder="Name or email"
               disabled={mutation.isPending}
-              aria-invalid={formState.errors.name ? true : undefined}
             />
-          </FormField>
-          <FormField label="Company email" required error={formState.errors.email?.message}>
-            <Input
-              {...register('email')}
-              type="email"
-              placeholder="name@ibotix.ai"
-              disabled={mutation.isPending}
-              aria-invalid={formState.errors.email ? true : undefined}
-            />
-          </FormField>
+            <p className="text-small text-muted">Type at least 2 characters.</p>
+          </div>
+
+          <UserSelect
+            label="New Admin"
+            value={userId}
+            onChange={setUserId}
+            options={lookup.data ?? []}
+            placeholder={
+              canSearch
+                ? lookup.isFetching
+                  ? 'Searching…'
+                  : 'Pick a person'
+                : 'Search for a person first'
+            }
+            disabled={!canSearch || mutation.isPending}
+          />
 
           {serverError ? (
             <p role="alert" className="text-small text-crit">
@@ -119,15 +118,17 @@ export function AddAdminDialog({
               Cancel
             </Button>
             <Button
-              type="submit"
+              type="button"
               variant="primary"
+              onClick={() => userId && mutation.mutate(userId)}
               loading={mutation.isPending}
-              loadingLabel="Sending"
+              loadingLabel="Saving"
+              disabled={!userId}
             >
-              Send invitation
+              Add Admin
             </Button>
           </DialogFooter>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

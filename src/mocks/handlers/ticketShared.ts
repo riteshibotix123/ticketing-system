@@ -51,15 +51,15 @@ export function futureMs(raw: unknown, field: string): number {
   return ms;
 }
 
-/** An assignee must be an active Spoke of the dept, Resolver, Admin or Super Admin. */
+/** An assignee must be an active member of the department, Admin or Super Admin. */
 export function assertAssignable(user: DbUser, departmentId: string): void {
   const eligible =
     user.state === 'active' &&
-    (user.spoke_departments.includes(departmentId) ||
-      user.roles.includes('resolver') ||
+    (user.department_id === departmentId ||
+      user.spoke_departments.includes(departmentId) ||
       user.roles.includes('admin') ||
       user.roles.includes('super_admin'));
   if (!eligible) {
-    throw422({ assignee_id: 'Pick an active Spoke, Resolver or Admin of this department.' });
+    throw422({ assignee_id: 'Pick an active member of this department.' });
   }
 }

@@ -6,7 +6,7 @@
  * users.approve_super_admin, and nobody reviews their own request.
  */
 import { http } from 'msw';
-import type { Role, SignupRequest } from '@/types/domain';
+import type { SignupRequest } from '@/types/domain';
 import { db, findDepartment, findUserByEmail, paginate, syncSpokes, type DbUser } from '../db';
 import {
   actorRef,
@@ -84,7 +84,11 @@ export const signupRequestHandlers = [
       const body = await readJson<{ approved_role?: string; approved_department?: string }>(
         request,
       );
-      const role = str(body.approved_role) as Role;
+      const rawRole = str(body.approved_role);
+      if (rawRole !== 'employee' && rawRole !== 'admin' && rawRole !== 'super_admin') {
+        throw422({ approved_role: 'Pick a role.' });
+      }
+      const role = rawRole;
       const department = str(body.approved_department);
       if (!grantableRoles(viewer).includes(role)) throw403(`You cannot grant the ${role} role.`);
       if (!department || !findDepartment(department)) {
@@ -102,7 +106,7 @@ export const signupRequestHandlers = [
       if (applicant) {
         applicant.roles = [role];
         applicant.department_id = department;
-        applicant.spoke_departments = role === 'spoke' ? [department] : [];
+        applicant.spoke_departments = [];
         applicant.state = 'active';
         syncSpokes();
       }

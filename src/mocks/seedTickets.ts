@@ -81,7 +81,6 @@ const ATT_SCREENSHOT: Attachment = {
   size: 184_320,
   mime: 'image/png',
   scan_status: 'clean',
-  url: '/mock-attachments/att-seed-1',
 };
 
 const SPECS: SeedTicket[] = [
@@ -483,6 +482,7 @@ function buildTicket(spec: SeedTicket): void {
     category_id: category.id,
     category_name: category.name,
     priority: spec.priority,
+    requested_priority: spec.priority,
     status: spec.status,
     confidential: spec.confidential ?? false,
     requester: ref(requester),
@@ -493,12 +493,14 @@ function buildTicket(spec: SeedTicket): void {
     sla_started_at: new Date(createdMs).toISOString(),
     acknowledged_at: ackMs != null ? new Date(ackMs).toISOString() : null,
     eta: spec.etaH != null ? inIso(spec.etaH) : null,
+    next_checkpoint_at: null,
     last_team_update_at: updateBaseMs != null ? new Date(updateBaseMs).toISOString() : null,
     resolved_at: spec.resolvedH != null ? agoIso(spec.resolvedH) : null,
     closed_at: spec.closedH != null ? agoIso(spec.closedH) : null,
     reopen_count: spec.reopenCount ?? 0,
     hold: spec.hold ? { reason: spec.hold.reason, review_date: inIso(spec.hold.reviewH) } : null,
     resolution_summary: spec.summary ?? null,
+    feedback: null,
     sla: { level: 0, kind: null, paused: false, stopped: false, due_at: null, label: '' },
     allowed_actions: [],
     attachments: spec.attachments ?? [],

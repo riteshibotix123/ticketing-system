@@ -6,13 +6,8 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import type { Ticket, TicketAction } from '@/types/domain';
 import { ActionField, ActionFormShell, useActionSubmit } from './ActionFormShell';
 
-type StatusAction = Extract<TicketAction, 'start_work' | 'ask_requester'>;
+type StatusAction = Extract<TicketAction, 'start_work' | 'ask_requester' | 'resume'>;
 
-/**
- * Spec 9.7: "Start work" has no fields (in-page confirm dialog, sets
- * In Progress); "Ask requester" takes an optional message and sets
- * Awaiting Requester, which pauses the timer.
- */
 export function StatusForm({
   ticket,
   action,
@@ -36,20 +31,27 @@ export function StatusForm({
     ticketId: ticket.id,
     action,
     successToast:
-      action === 'start_work' ? 'Status set to In Progress.' : 'Awaiting requester. Timer paused.',
+      action === 'ask_requester'
+        ? 'Awaiting requester. Timer paused.'
+        : 'Status set to In Progress.',
     setError,
   });
 
-  if (action === 'start_work') {
+  if (action === 'start_work' || action === 'resume') {
+    const resuming = action === 'resume';
     return (
       <ConfirmDialog
         open
         onOpenChange={(open) => {
           if (!open) onDone();
         }}
-        title="Start work?"
-        description="This sets the ticket to In Progress and notifies the requester."
-        confirmLabel="Start work"
+        title={resuming ? 'Resume work?' : 'Start work?'}
+        description={
+          resuming
+            ? 'This resumes the timers and sets the ticket to In Progress.'
+            : 'This sets the ticket to In Progress and notifies the requester.'
+        }
+        confirmLabel={resuming ? 'Resume work' : 'Start work'}
         loading={act.pending}
         onConfirm={() => {
           void act.submit({ status: 'in_progress' }).then((ok) => {
@@ -67,10 +69,9 @@ export function StatusForm({
   }
 
   const onValid = async (values: AskRequesterInput) => {
-    const message = values.message?.trim();
     const ok = await act.submit({
       status: 'awaiting_requester',
-      ...(message ? { message } : {}),
+      message: values.message.trim(),
     });
     if (ok) onDone();
   };
@@ -86,7 +87,8 @@ export function StatusForm({
       onConfirm={handleSubmit(onValid)}
     >
       <ActionField
-        label="Message (optional)"
+        label="Message"
+        required
         error={errors.message?.message}
         hint="Sent to the requester with the status change."
         render={(f) => (

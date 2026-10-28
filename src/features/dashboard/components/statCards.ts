@@ -44,28 +44,17 @@ function formatSeconds(seconds: number): string {
 const ALL = '/tickets?tab=all';
 const QUEUE = '/tickets?tab=queue';
 const MINE = '/tickets?tab=mine';
+const ASSIGNED = '/tickets?tab=assigned';
 
-/** Admin KPI tiles (spec 9.3). sla_met_pct and reopen_rate_pct are informational. */
+/** Admin KPI tiles (spec 9.3). Nullable metrics are hidden until Release 2. */
 export function adminStatCards(d: AdminDashboard): StatCard[] {
-  return [
+  const cards: StatCard[] = [
     {
       key: 'open',
       label: 'Open tickets',
       value: String(d.open_count),
       hint: 'Across all departments',
       to: `${ALL}&status=open`,
-    },
-    {
-      key: 'sla-met',
-      label: 'SLA met',
-      value: formatPct(d.sla_met_pct),
-      hint: 'Answered within the deadline',
-    },
-    {
-      key: 'avg-response',
-      label: 'Avg first response',
-      value: formatSeconds(d.avg_initial_response_seconds),
-      hint: 'Ticket created to first reply',
     },
     {
       key: 'breached',
@@ -89,12 +78,38 @@ export function adminStatCards(d: AdminDashboard): StatCard[] {
       to: `${ALL}&sla_state=stale`,
     },
     {
+      key: 'pending-approvals',
+      label: 'Pending access requests',
+      value: String(d.pending_approvals),
+      hint: 'Waiting for a decision',
+      to: '/approvals',
+    },
+  ];
+  if (d.sla_met_pct !== null) {
+    cards.push({
+      key: 'sla-met',
+      label: 'SLA met',
+      value: formatPct(d.sla_met_pct),
+      hint: 'Answered within the deadline',
+    });
+  }
+  if (d.avg_initial_response_seconds !== null) {
+    cards.push({
+      key: 'avg-response',
+      label: 'Avg first response',
+      value: formatSeconds(d.avg_initial_response_seconds),
+      hint: 'Ticket created to first reply',
+    });
+  }
+  if (d.reopen_rate_pct !== null) {
+    cards.push({
       key: 'reopen-rate',
       label: 'Reopen rate',
       value: formatPct(d.reopen_rate_pct),
       hint: 'Reopened after resolve',
-    },
-  ];
+    });
+  }
+  return cards;
 }
 
 /** Spoke KPI tiles — all deep-link into the department queue (spec 9.3). */
@@ -175,6 +190,13 @@ export function employeeStatCards(d: EmployeeDashboard): StatCard[] {
       value: String(d.resolved_to_confirm),
       hint: 'Confirm closure or reopen',
       to: `${MINE}&status=resolved`,
+    },
+    {
+      key: 'assigned',
+      label: 'Assigned to me',
+      value: String(d.assigned_to_me),
+      hint: 'Work assigned to you',
+      to: ASSIGNED,
     },
     {
       key: 'closed',

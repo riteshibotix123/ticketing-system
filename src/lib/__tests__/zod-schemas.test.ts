@@ -50,12 +50,12 @@ describe('rule 4: acknowledgement needs an ETA or a reason + checkpoint', () => 
   const future = new Date(Date.now() + 3600_000).toISOString();
 
   it('accepts an ETA', () => {
-    expect(acknowledgeSchema.safeParse({ use_eta: true, eta: future }).success).toBe(true);
+    expect(acknowledgeSchema.safeParse({ eta: future }).success).toBe(true);
   });
 
   it('rejects an ETA in the past', () => {
     const past = new Date(Date.now() - 3600_000).toISOString();
-    const result = acknowledgeSchema.safeParse({ use_eta: true, eta: past });
+    const result = acknowledgeSchema.safeParse({ eta: past });
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues[0]?.message).toMatch(/future/i);
   });
@@ -63,16 +63,14 @@ describe('rule 4: acknowledgement needs an ETA or a reason + checkpoint', () => 
   it('accepts a reason + checkpoint without an ETA', () => {
     expect(
       acknowledgeSchema.safeParse({
-        use_eta: false,
         no_eta_reason: 'Waiting for the vendor',
-        checkpoint: 'Tomorrow morning',
+        next_checkpoint_at: future,
       }).success,
     ).toBe(true);
   });
 
   it('rejects neither being provided', () => {
-    expect(acknowledgeSchema.safeParse({ use_eta: false }).success).toBe(false);
-    expect(acknowledgeSchema.safeParse({ use_eta: true }).success).toBe(false);
+    expect(acknowledgeSchema.safeParse({}).success).toBe(false);
   });
 });
 
@@ -122,13 +120,18 @@ describe('rules 5–10: required reasons and summaries', () => {
 
   it('12 — approval requires a role and department', () => {
     expect(
-      approveSignupSchema.safeParse({ approved_role: 'spoke', approved_department: 'IT' }).success,
+      approveSignupSchema.safeParse({ approved_role: 'employee', approved_department: 'IT' })
+        .success,
     ).toBe(true);
     expect(
       approveSignupSchema.safeParse({ approved_role: 'admin', approved_department: '' }).success,
     ).toBe(false);
     expect(
       approveSignupSchema.safeParse({ approved_role: 'boss', approved_department: 'IT' } as never)
+        .success,
+    ).toBe(false);
+    expect(
+      approveSignupSchema.safeParse({ approved_role: 'spoke', approved_department: 'IT' } as never)
         .success,
     ).toBe(false);
   });
@@ -140,11 +143,12 @@ describe('rule 15: password and signup validation', () => {
       name: 'Asha Verma',
       email: 'asha.verma@ibotix.ai',
       requested_role: 'employee',
-      requested_department: 'Engineering',
+      requested_department: 'ENG',
     };
     expect(signupSchema.safeParse({ ...base, password: 'short' }).success).toBe(false);
     expect(signupSchema.safeParse({ ...base, password: 'IbotixDemo@2026' }).success).toBe(true);
     expect(signupSchema.safeParse({ ...base, email: 'not-an-email' }).success).toBe(false);
+    expect(signupSchema.safeParse({ ...base, requested_role: 'spoke' }).success).toBe(false);
   });
 
   it('scores password strength', () => {
@@ -165,10 +169,16 @@ describe('policy form', () => {
   it('accepts numeric hours coerced from strings', () => {
     const result = policyFormSchema.safeParse({
       initial_response_hours: '24',
+      update_warning_hours: '20',
       update_cadence_hours: '24',
+      eta_warning_hours: '2',
+      escalation_repeat_hours: '24',
       requester_reminder_hours: '48',
       auto_close_business_days: '',
+      reopen_window_days: '7',
+      max_reopens: '3',
       sla_mode: 'calendar',
+      admins_can_manage_departments: true,
       warning_hours: { low: 18, medium: 18, high: 18, critical: 12 },
       l3_hours: { low: 48, medium: 48, high: 36, critical: 30 },
     });

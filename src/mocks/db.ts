@@ -13,23 +13,35 @@
  *   `resetMockClock` can undo it deterministically.
  */
 import type {
+  AccountState,
   Attachment,
   AuditEntry,
   Department,
   Notification,
   Paged,
   PolicyConfig,
+  Role,
   SignupRequest,
   Ticket,
   TimelineEvent,
-  User,
   UserRef,
 } from '@/types/domain';
 
 export const HOUR_MS = 3_600_000;
 
 /** Full user row; password is plaintext because this is a mock (never do this for real). */
-export interface DbUser extends User {
+export interface DbUser {
+  id: string;
+  name: string;
+  email: string;
+  title?: string;
+  roles: Role[];
+  state: AccountState;
+  department_id: string | null;
+  spoke_departments: string[];
+  mfa_enabled: boolean;
+  created_at: string;
+  last_login_at: string | null;
   password: string;
   theme?: 'system' | 'light' | 'dark';
 }
@@ -120,11 +132,16 @@ export function freshPolicy(): PolicyConfig {
     initial_response_hours: 24,
     warning_hours: { low: 18, medium: 18, high: 18, critical: 12 },
     l3_hours: { low: 48, medium: 48, high: 36, critical: 30 },
+    update_warning_hours: 20,
     update_cadence_hours: 24,
+    eta_warning_hours: 2,
+    escalation_repeat_hours: 24,
     sla_mode: 'calendar',
     admins_can_manage_departments: true,
     requester_reminder_hours: 48,
     auto_close_business_days: 3,
+    reopen_window_days: 7,
+    max_reopens: 3,
   };
 }
 
@@ -190,10 +207,8 @@ export function spokesOf(departmentId: string): DbUser[] {
   return db.users.filter((u) => u.state === 'active' && u.spoke_departments.includes(departmentId));
 }
 
-export function usersWithRole(role: string): DbUser[] {
-  return db.users.filter(
-    (u) => u.state === 'active' && u.roles.includes(role as User['roles'][number]),
-  );
+export function usersWithRole(role: Role): DbUser[] {
+  return db.users.filter((u) => u.state === 'active' && u.roles.includes(role));
 }
 
 /**
@@ -242,5 +257,6 @@ export function syncSpokes(): void {
     dept.spokes = db.users
       .filter((u) => u.state === 'active' && u.spoke_departments.includes(dept.id))
       .map((u) => ref(u));
+    dept.accepts_tickets = dept.active && dept.spokes.length > 0;
   }
 }

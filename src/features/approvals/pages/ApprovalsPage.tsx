@@ -1,4 +1,4 @@
-﻿import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState, ErrorState } from '@/components/common/States';
@@ -21,7 +21,7 @@ export default function ApprovalsPage() {
 
   const pendingQuery = useQuery({
     queryKey: queryKeys.signupRequests({ status: 'pending' }),
-    queryFn: () => usersApi.signupRequests('pending'),
+    queryFn: () => usersApi.signupRequests({ status: 'pending' }),
   });
 
   let pendingContent: ReactNode;

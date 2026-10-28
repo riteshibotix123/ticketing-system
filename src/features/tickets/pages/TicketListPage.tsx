@@ -5,7 +5,7 @@ import type { SortingState } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
 import { errorMessage, isApiError } from '@/api/client';
 import { departmentsApi } from '@/api/endpoints/departments';
-import { ticketsApi, type TicketListParams } from '@/api/endpoints/tickets';
+import { ticketsApi, type TicketListParams, type SlaStateFilter } from '@/api/endpoints/tickets';
 import { queryKeys } from '@/api/queryKeys';
 import { DataTable } from '@/components/common/DataTable';
 import { EmptyState } from '@/components/common/States';
@@ -15,7 +15,7 @@ import { OPEN_STATUSES, PAGE_SIZE, TICKET_TABS, type TicketTabId } from '@/lib/c
 import { useDebounce } from '@/hooks/useDebounce';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useUrlFilters } from '@/hooks/useUrlFilters';
-import type { Ticket } from '@/types/domain';
+import type { Priority, Ticket, TicketStatus } from '@/types/domain';
 import { TicketFilters, type TicketFilterValues } from '../components/list/TicketFilters';
 import { defaultTicketTab, TicketTabs, visibleTicketTabs } from '../components/list/TicketTabs';
 import {
@@ -103,10 +103,10 @@ export default function TicketListPage() {
         ? undefined
         : values.status === 'open'
           ? OPEN_STATUSES
-          : [values.status],
-    priority: values.priority === 'any' ? undefined : [values.priority],
+          : [values.status as TicketStatus],
+    priority: values.priority === 'any' ? undefined : [values.priority as Priority],
     department_id: values.department || undefined,
-    sla_state: values.sla === 'any' ? undefined : values.sla,
+    sla_state: values.sla === 'any' ? undefined : (values.sla as SlaStateFilter),
     confidential: values.confidential === '1' ? true : undefined,
     overdue_eta: values.overdue === '1' ? true : undefined,
     sort: get('sort') || DEFAULT_SORT,

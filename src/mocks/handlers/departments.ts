@@ -28,28 +28,24 @@ export const departmentHandlers = [
     respond(request, async () => {
       const user = requireUser(request);
       assertCanManageDepartments(user);
-      const body = await readJson<{ name?: string; active?: boolean; confidential?: boolean }>(
-        request,
-      );
+      const body = await readJson<{ id?: string; name?: string; active?: boolean }>(request);
+      const id = str(body.id).trim().toUpperCase();
       const name = str(body.name);
-      if (name.length < 2) throw422({ name: 'Enter a department name.' });
-      if (db.departments.some((d) => d.name.toLowerCase() === name.toLowerCase())) {
-        throw422({ name: 'A department with this name already exists.' });
+      const fields: Record<string, string> = {};
+      if (!/^[A-Z]{2,6}$/.test(id)) fields.id = 'Use 2 to 6 uppercase letters.';
+      else if (db.departments.some((d) => d.id === id)) fields.id = 'That code is already in use.';
+      if (name.length < 2) fields.name = 'Enter a department name.';
+      else if (db.departments.some((d) => d.name.toLowerCase() === name.toLowerCase())) {
+        fields.name = 'A department with this name already exists.';
       }
-      // New departments have no Spokes, so they must start inactive (spec 10.3).
+      if (Object.keys(fields).length > 0) throw422(fields);
       if (body.active === true) throw422({ active: NEED_SPOKE });
-      const id =
-        (name
-          .toUpperCase()
-          .replace(/[^A-Z]/g, '')
-          .slice(0, 3) || 'DPT') + db.departments.length;
       const dept: Department = {
         id,
         name,
         spokes: [],
-        escalation_primary: null,
-        escalation_backup: null,
-        confidential: body.confidential === true,
+        escalation_contact: null,
+        accepts_tickets: false,
         categories: [],
         active: false,
       };
@@ -70,18 +66,16 @@ export const departmentHandlers = [
       const user = requireUser(request);
       assertCanManageDepartments(user);
       const dept = loadDepartment(String(params.id));
-      const body = await readJson<{ name?: string; active?: boolean; confidential?: boolean }>(
-        request,
-      );
+      const body = await readJson<{ name?: string; active?: boolean }>(request);
       if (typeof body.name === 'string') {
         const name = str(body.name);
         if (name.length < 2) throw422({ name: 'Enter a department name.' });
         dept.name = name;
       }
-      if (typeof body.confidential === 'boolean') dept.confidential = body.confidential;
       if (typeof body.active === 'boolean') {
         if (body.active && spokesOf(dept.id).length === 0) throw422({ active: NEED_SPOKE });
         dept.active = body.active;
+        dept.accepts_tickets = dept.active && spokesOf(dept.id).length > 0;
       }
       addAudit({
         actor: actorRef(user),
@@ -105,9 +99,6 @@ export const departmentHandlers = [
       if (target.state !== 'active') throw422({ user_id: 'That account is not active.' });
       if (!target.spoke_departments.includes(dept.id)) target.spoke_departments.push(dept.id);
       if (!target.roles.includes('spoke')) target.roles.push('spoke');
-      if (!target.confidential_departments.includes(dept.id) && dept.confidential) {
-        target.confidential_departments.push(dept.id);
-      }
       const dto = departmentDto(dept.id);
       addAudit({
         actor: actorRef(user),
@@ -128,9 +119,6 @@ export const departmentHandlers = [
       const target = findUser(String(params.userId));
       if (!target) throw404();
       target.spoke_departments = target.spoke_departments.filter((d) => d !== dept.id);
-      target.confidential_departments = target.confidential_departments.filter(
-        (d) => d !== dept.id,
-      );
       // Last department removed -> the Spoke role goes too.
       if (target.spoke_departments.length === 0) {
         target.roles = target.roles.filter((r) => r !== 'spoke');
@@ -152,24 +140,19 @@ export const departmentHandlers = [
       const user = requireUser(request);
       assertCanManageDepartments(user);
       const dept = loadDepartment(String(params.id));
-      const body = await readJson<{ primary_id?: string | null; backup_id?: string | null }>(
-        request,
-      );
-      const resolveContact = (raw: unknown, field: string) => {
-        const id = str(raw);
-        if (!id) return null;
-        const contact: DbUser | null = findUser(id);
-        if (!contact || contact.state !== 'active') throw422({ [field]: 'Pick an active user.' });
-        return serializeUser(contact);
-      };
-      dept.escalation_primary = resolveContact(body.primary_id, 'primary_id');
-      dept.escalation_backup = resolveContact(body.backup_id, 'backup_id');
+      const body = await readJson<{ contact_id?: string | null }>(request);
+      const id = str(body.contact_id);
+      const contact: DbUser | null = id ? findUser(id) : null;
+      if (id && (!contact || contact.state !== 'active')) {
+        throw422({ contact_id: 'Pick an active user.' });
+      }
+      dept.escalation_contact = contact ? serializeUser(contact) : null;
       addAudit({
         actor: actorRef(user),
         action: 'department.escalation_updated',
         object_type: 'department',
         object_id: dept.id,
-        detail: `Escalation contacts for ${dept.name}: ${dept.escalation_primary?.name ?? 'none'} / ${dept.escalation_backup?.name ?? 'none'}`,
+        detail: `Escalation contact for ${dept.name}: ${dept.escalation_contact?.name ?? 'none'}`,
       });
       return ok(dept, request);
     }),

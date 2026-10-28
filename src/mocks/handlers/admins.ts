@@ -4,12 +4,11 @@
  * remove Admin accounts; Super Admin rows are protected.
  */
 import { http } from 'msw';
-import { db, findUser, findUserByEmail, paginate, uid, type DbUser } from '../db';
+import { db, findUser, type DbUser } from '../db';
 import {
   actorRef,
   addAudit,
   noContent,
-  nowIso,
   ok,
   readJson,
   respond,
@@ -19,7 +18,7 @@ import {
   throw422,
 } from '../helpers';
 import { serializeUser } from '../access';
-import { DEMO_PASSWORD, invalidateUserTokens } from '../auth';
+import { invalidateUserTokens } from '../auth';
 import { requireUser } from './guard';
 import { p } from './paths';
 
@@ -44,8 +43,7 @@ export const adminHandlers = [
     respond(request, () => {
       const viewer = requireUser(request);
       assertSuperAdmin(viewer);
-      const rows = adminRows().map(serializeUser);
-      return ok(paginate(rows, new URL(request.url).searchParams.get('page'), 100), request);
+      return ok(adminRows().map(serializeUser), request);
     }),
   ),
 
@@ -53,37 +51,22 @@ export const adminHandlers = [
     respond(request, async () => {
       const viewer = requireUser(request);
       assertSuperAdmin(viewer);
-      const body = await readJson<{ email?: string; name?: string }>(request);
-      const email = str(body.email);
-      const name = str(body.name);
-      const fields: Record<string, string> = {};
-      if (name.length < 2) fields.name = 'Enter the full name.';
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fields.email = 'Enter a valid email address.';
-      else if (findUserByEmail(email)) fields.email = 'An account with this email already exists.';
-      if (Object.keys(fields).length > 0) throw422(fields);
-
-      const user: DbUser = {
-        id: uid('u'),
-        name,
-        email,
-        roles: ['admin'],
-        department_id: null,
-        state: 'active',
-        spoke_departments: [],
-        confidential_departments: [],
-        mfa_enabled: true,
-        created_at: nowIso(),
-        password: DEMO_PASSWORD,
-      };
-      db.users.push(user);
+      const body = await readJson<{ user_id?: string }>(request);
+      const target = findUser(str(body.user_id));
+      if (!target) throw422({ user_id: 'Pick an active user.' });
+      if (target.state !== 'active') throw422({ user_id: 'That account is not active.' });
+      if (target.roles.includes('admin') || target.roles.includes('super_admin')) {
+        throw422({ user_id: 'That person is already an Admin.' });
+      }
+      target.roles = [...target.roles.filter((role) => role !== 'employee'), 'admin'];
       addAudit({
         actor: actorRef(viewer),
         action: 'admin.created',
         object_type: 'user',
-        object_id: user.id,
-        detail: `${name} added as Admin`,
+        object_id: target.id,
+        detail: `${target.name} added as Admin`,
       });
-      return ok(serializeUser(user), request, 201);
+      return ok(serializeUser(target), request, 201);
     }),
   ),
 
