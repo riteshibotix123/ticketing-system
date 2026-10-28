@@ -1,0 +1,53 @@
+/* Design tokens. Every colour in components must come from these variables. */
+
+:root,
+[data-theme='light'] {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eceff3;
+  --line: #dadfe7;
+  --fg: #141a25;
+  --muted: #586277;
+
+  --accent: #0b6e6e;
+  --accent-fg: #ffffff;
+  --accent-soft: #d9eeec;
+
+  --ok: #1b7a4b;
+  --ok-soft: #ddf1e6;
+  --warn: #8f5b00;
+  --warn-soft: #fbebc8;
+  --crit: #b3261e;
+  --crit-soft: #fad9d5;
+  --info: #26579b;
+  --info-soft: #dce8f7;
+
+  --note: #fff6dc;
+
+  --sidebar-w: 236px;
+  --content-max: 1240px;
+}
+
+[data-theme='dark'] {
+  --bg: #0e1218;
+  --surface: #161b24;
+  --surface-2: #1e2430;
+  --line: #2a3140;
+  --fg: #e6e9ef;
+  --muted: #9aa4b6;
+
+  --accent: #45bdb6;
+  --accent-fg: #06201f;
+  --accent-soft: #12302f;
+
+  --ok: #5ccb8e;
+  --ok-soft: #14301f;
+  --warn: #f0b84a;
+  --warn-soft: #332608;
+  --crit: #ff8a80;
+  --crit-soft: #3a1612;
+  --info: #8db6f0;
+  --info-soft: #14263f;
+
+  --note: #2e2710;
+}
