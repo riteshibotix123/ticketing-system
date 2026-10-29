@@ -1,7 +1,7 @@
 import uuid
 from typing import Final
 
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
@@ -37,22 +37,25 @@ class DashboardService:
         requested = Ticket.requester_id == actor.id
         assigned = Ticket.assignee_id == actor.id
         involved = or_(requested, assigned)
+        counts = self._counts(
+            actor,
+            involved,
+            open=and_(requested, is_active_ticket()),
+            awaiting_my_response=and_(requested, Ticket.status == TicketStatus.AWAITING_REQUESTER),
+            resolved_to_confirm=and_(requested, Ticket.status == TicketStatus.RESOLVED),
+            closed=and_(requested, Ticket.status == TicketStatus.CLOSED),
+            assigned_to_me=and_(assigned, is_active_ticket()),
+            assigned_warning=and_(assigned, is_active_ticket(), Ticket.escalation_level == 1),
+            assigned_breached=and_(assigned, is_active_ticket(), Ticket.escalation_level >= 2),
+        )
         return EmployeeDashboardOut(
-            open=self._count(actor, requested, is_active_ticket()),
-            awaiting_my_response=self._count(
-                actor, requested, Ticket.status == TicketStatus.AWAITING_REQUESTER
-            ),
-            resolved_to_confirm=self._count(
-                actor, requested, Ticket.status == TicketStatus.RESOLVED
-            ),
-            closed=self._count(actor, requested, Ticket.status == TicketStatus.CLOSED),
-            assigned_to_me=self._count(actor, assigned, is_active_ticket()),
-            assigned_warning=self._count(
-                actor, assigned, is_active_ticket(), Ticket.escalation_level == 1
-            ),
-            assigned_breached=self._count(
-                actor, assigned, is_active_ticket(), Ticket.escalation_level >= 2
-            ),
+            open=counts["open"],
+            awaiting_my_response=counts["awaiting_my_response"],
+            resolved_to_confirm=counts["resolved_to_confirm"],
+            closed=counts["closed"],
+            assigned_to_me=counts["assigned_to_me"],
+            assigned_warning=counts["assigned_warning"],
+            assigned_breached=counts["assigned_breached"],
             recent_updates=self._recent_updates(actor, involved),
             attention=self._attention(
                 actor,
@@ -71,22 +74,25 @@ class DashboardService:
         now = self._clock.now()
         overdue_eta = and_(is_active_ticket(), Ticket.eta.is_not(None), Ticket.eta < now)
         kpis = KpiService(self._session, self._clock).dashboard(actor, actor.spoke_department_ids)
+        counts = self._counts(
+            actor,
+            scope,
+            new_unacknowledged=Ticket.status == TicketStatus.NEW,
+            approaching_sla=and_(is_active_ticket(), Ticket.escalation_level == 1),
+            breached=Ticket.escalation_level >= 2,
+            stale_or_eta_overdue=or_(Ticket.update_overdue.is_(True), overdue_eta),
+            awaiting_requester=Ticket.status == TicketStatus.AWAITING_REQUESTER,
+            on_hold=Ticket.status == TicketStatus.ON_HOLD,
+            resolved_pending_closure=Ticket.status == TicketStatus.RESOLVED,
+        )
         return SpokeDashboardOut(
-            new_unacknowledged=self._count(actor, scope, Ticket.status == TicketStatus.NEW),
-            approaching_sla=self._count(
-                actor, scope, is_active_ticket(), Ticket.escalation_level == 1
-            ),
-            breached=self._count(actor, scope, Ticket.escalation_level >= 2),
-            stale_or_eta_overdue=self._count(
-                actor, scope, or_(Ticket.update_overdue.is_(True), overdue_eta)
-            ),
-            awaiting_requester=self._count(
-                actor, scope, Ticket.status == TicketStatus.AWAITING_REQUESTER
-            ),
-            on_hold=self._count(actor, scope, Ticket.status == TicketStatus.ON_HOLD),
-            resolved_pending_closure=self._count(
-                actor, scope, Ticket.status == TicketStatus.RESOLVED
-            ),
+            new_unacknowledged=counts["new_unacknowledged"],
+            approaching_sla=counts["approaching_sla"],
+            breached=counts["breached"],
+            stale_or_eta_overdue=counts["stale_or_eta_overdue"],
+            awaiting_requester=counts["awaiting_requester"],
+            on_hold=counts["on_hold"],
+            resolved_pending_closure=counts["resolved_pending_closure"],
             sla_met_pct=kpis.sla_met_pct,
             avg_initial_response_seconds=kpis.avg_initial_response_seconds,
             reopen_rate_pct=kpis.reopen_rate_pct,
@@ -98,11 +104,19 @@ class DashboardService:
         if not self._allowed(actor, TICKETS_VIEW_ALL):
             raise forbidden()
         kpis = KpiService(self._session, self._clock).dashboard(actor, None)
+        counts = self._counts(
+            actor,
+            true(),
+            open_count=is_active_ticket(),
+            breached_count=Ticket.escalation_level >= 2,
+            l3_count=Ticket.escalation_level == 3,
+            stale_count=Ticket.update_overdue.is_(True),
+        )
         return AdminDashboardOut(
-            open_count=self._count(actor, is_active_ticket()),
-            breached_count=self._count(actor, Ticket.escalation_level >= 2),
-            l3_count=self._count(actor, Ticket.escalation_level == 3),
-            stale_count=self._count(actor, Ticket.update_overdue.is_(True)),
+            open_count=counts["open_count"],
+            breached_count=counts["breached_count"],
+            l3_count=counts["l3_count"],
+            stale_count=counts["stale_count"],
             pending_approvals=self._pending_approvals(actor),
             sla_met_pct=kpis.sla_met_pct,
             avg_initial_response_seconds=kpis.avg_initial_response_seconds,
@@ -115,11 +129,16 @@ class DashboardService:
         policy = PolicyService(self._session).current()
         return has_permission(actor, flag, policy.admins_can_manage_departments)
 
-    def _count(self, actor: Actor, *clauses: ColumnElement[bool]) -> int:
+    def _counts(
+        self, actor: Actor, scope: ColumnElement[bool], **filters: ColumnElement[bool]
+    ) -> dict[str, int]:
         statement = (
-            select(func.count()).select_from(Ticket).where(visible_ticket_clause(actor), *clauses)
+            select(*(func.count().filter(clause) for clause in filters.values()))
+            .select_from(Ticket)
+            .where(visible_ticket_clause(actor), scope)
         )
-        return self._session.scalar(statement) or 0
+        row = self._session.execute(statement).one()
+        return {name: int(value) for name, value in zip(filters, row, strict=True)}
 
     def _attention(self, actor: Actor, *clauses: ColumnElement[bool]) -> list[TicketOut]:
         statement = apply_sort(visible_tickets(actor).where(*clauses), URGENCY).limit(

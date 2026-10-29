@@ -124,6 +124,7 @@ class AttachmentService:
             raise validation_error(
                 {FILE_FIELD: "Remove an unused upload before adding another file"}
             )
+        scan_status = self._scanner.scan(content)
         key = self._storage.save(io.BytesIO(content), STORAGE_HINT)
         attachment = Attachment(
             uploader_id=actor.id,
@@ -132,11 +133,15 @@ class AttachmentService:
             size_bytes=len(content),
             storage_key=key,
             sha256=hashlib.sha256(content).hexdigest(),
-            scan_status=self._scanner.scan(content),
+            scan_status=scan_status,
             created_at=self._clock.now(),
         )
-        self._session.add(attachment)
-        self._session.flush()
+        try:
+            self._session.add(attachment)
+            self._session.flush()
+        except Exception:
+            self._storage.delete(key)
+            raise
         return attachment_out(attachment)
 
     def unlinked_count(self, user_id: uuid.UUID) -> int:

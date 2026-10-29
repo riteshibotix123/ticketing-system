@@ -14,11 +14,10 @@ from app.core.db import SessionLocal
 from app.core.logging import configure_logging
 from app.core.types import JsonObject, JsonValue
 from app.integrations.email import build_sender
-from app.models.notification import WorkerHeartbeat
+from app.models.notification import HEARTBEAT_NAME, WorkerHeartbeat
+from app.services.handlers import register_all
 from app.worker import Job, JobContext
 from app.worker.jobs import registered_jobs
-
-HEARTBEAT_NAME = "worker"
 
 logger = logging.getLogger("app.worker")
 
@@ -124,6 +123,7 @@ def install_signal_handlers(worker: Worker) -> None:
 
 def main() -> None:
     configure_logging()
+    register_all()
     settings = get_settings()
     context = JobContext(clock=SystemClock(), settings=settings, sender=build_sender(settings))
     worker = Worker(SessionLocal, context, registered_jobs(), settings.worker_tick_seconds)

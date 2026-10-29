@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -7,7 +6,6 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock, get_clock
 from app.core.config import Settings, get_settings
 from app.core.db import get_db
-from app.core.enums import Role
 from app.core.errors import forbidden, unauthenticated
 from app.core.security import InvalidAccessToken, decode_access_token
 from app.policy import Actor
@@ -53,15 +51,6 @@ def get_actor(request: Request, db: DbSession, clock: ClockDep, settings: Settin
 
 
 CurrentActor = Annotated[Actor, Depends(get_actor)]
-
-
-def require_roles(*roles: Role) -> Callable[[Actor], Actor]:
-    def dependency(actor: CurrentActor) -> Actor:
-        if not any(actor.has_role(role) for role in roles):
-            raise forbidden()
-        return actor
-
-    return dependency
 
 
 def require_allowed_origin(request: Request, settings: SettingsDep) -> None:

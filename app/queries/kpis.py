@@ -143,10 +143,11 @@ def trend_statement(
 
 
 def sla_statement(scope: Scope, window: Window) -> Select[tuple[str, int, int]]:
-    missed = exists().where(
-        EscalationEvent.ticket_id == Ticket.id,
-        EscalationEvent.timer_kind == TimerKind.INITIAL_RESPONSE,
-        EscalationEvent.level >= 2,
+    missed = Ticket.id.in_(
+        select(EscalationEvent.ticket_id).where(
+            EscalationEvent.timer_kind == TimerKind.INITIAL_RESPONSE,
+            EscalationEvent.level >= 2,
+        )
     )
     inner = (
         select(
@@ -165,10 +166,11 @@ def sla_statement(scope: Scope, window: Window) -> Select[tuple[str, int, int]]:
 
 
 def _event_in(action: str, window: Window) -> ColumnElement[bool]:
-    return exists().where(
-        TicketEvent.ticket_id == Ticket.id,
-        TicketEvent.action == action,
-        window.contains(TicketEvent.at),
+    return Ticket.id.in_(
+        select(TicketEvent.ticket_id).where(
+            TicketEvent.action == action,
+            window.contains(TicketEvent.at),
+        )
     )
 
 

@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import Iterator
 from datetime import timedelta
 
@@ -8,12 +7,10 @@ from httpx import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
 from app.core.clock import Clock, FrozenClock, get_clock
 from app.core.config import Environment, Settings
 from app.core.db import get_db, transactional
 from app.core.enums import AccountState, Role, SignupStatus
-from app.core.errors import ApiError
 from app.core.security import create_access_token, hash_password, hash_token, verify_password
 from app.main import create_app
 from app.models import (
@@ -25,7 +22,6 @@ from app.models import (
     RefreshToken,
     User,
 )
-from app.policy import Actor
 from app.services.policy import PolicyService
 from tests.factories import (
     make_department,
@@ -483,9 +479,11 @@ def test_forgot_password_enqueues_reset_email(
     email = db.scalars(select(EmailOutbox)).one()
     assert email.to_address == "alice@ibotix.ai"
     assert email.template == "password_reset"
-    reset_url = email.context["reset_url"]
-    assert isinstance(reset_url, str)
-    raw = reset_url.split("token=", 1)[1]
+    raw = email.context["token"]
+    assert isinstance(raw, str)
+    assert email.context["expires_minutes"] == 60
+    assert email.subject == "Reset your password"
+    assert f"/reset-password?token={raw}" in email.body_text
     assert token.token_hash == hash_token(raw)
     assert raw not in token.token_hash
 
@@ -598,28 +596,3 @@ def test_public_endpoints_never_return_401(client: TestClient) -> None:
     assert client.post(FORGOT, json={"email": "x@ibotix.ai"}, headers=headers).status_code == 202
     reset = client.post(RESET, json={"token": "nope", "password": NEW_PASSWORD}, headers=headers)
     assert reset.status_code == 422
-
-
-def make_actor(role: Role, spoke: frozenset[str] = frozenset()) -> Actor:
-    return Actor(
-        id=uuid.uuid4(),
-        global_role=role,
-        department_id="IT",
-        spoke_department_ids=spoke,
-        name="Actor",
-        email="actor@ibotix.ai",
-    )
-
-
-def test_require_roles() -> None:
-    staff_only = require_roles(Role.ADMIN, Role.SUPER_ADMIN)
-    spoke_only = require_roles(Role.SPOKE)
-    admin = make_actor(Role.ADMIN)
-    assert staff_only(admin) is admin
-    with pytest.raises(ApiError) as denied:
-        staff_only(make_actor(Role.EMPLOYEE, frozenset({"IT"})))
-    assert denied.value.code.value == "forbidden"
-    spoke = make_actor(Role.EMPLOYEE, frozenset({"IT"}))
-    assert spoke_only(spoke) is spoke
-    with pytest.raises(ApiError):
-        spoke_only(make_actor(Role.EMPLOYEE))

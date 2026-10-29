@@ -1,4 +1,3 @@
-import html
 import math
 import uuid
 from dataclasses import dataclass
@@ -31,10 +30,10 @@ from app.core.security import (
     verify_password,
 )
 from app.models.identity import EmailToken, EmailTokenPurpose, RefreshToken, SignupRequest, User
-from app.models.notification import EmailOutbox
 from app.policy import Actor
 from app.schemas.auth import LoginSuccess, MfaConfirmSuccess, MfaSetupResponse, RefreshResponse
 from app.services.audit import AuditService
+from app.services.email_outbox import enqueue_email
 from app.services.me import MeService
 from app.services.mfa import MfaChallenge, MfaService
 from app.services.rate_limit import (
@@ -203,7 +202,7 @@ class AuthService:
                 updated_at=now,
             )
         )
-        self._enqueue_reset_email(user, raw, now)
+        self._enqueue_reset_email(user, raw)
         self._session.flush()
         return None
 
@@ -319,31 +318,15 @@ class AuthService:
             .values(revoked_at=now, updated_at=now)
         )
 
-    def _enqueue_reset_email(self, user: User, raw_token: str, now: datetime) -> None:
-        base_url = self._settings.frontend_base_url.rstrip("/")
-        reset_url = f"{base_url}/reset-password?token={raw_token}"
-        minutes = int(RESET_TOKEN_LIFETIME.total_seconds() // 60)
-        body_text = (
-            f"Hello {user.name},\n\n"
-            f"Use this link to reset your password. It expires in {minutes} minutes.\n\n"
-            f"{reset_url}\n\n"
-            "If you did not ask for a reset, you can ignore this email."
-        )
-        body_html = (
-            f"<p>Hello {html.escape(user.name)},</p>"
-            f"<p>Use this link to reset your password. It expires in {minutes} minutes.</p>"
-            f'<p><a href="{html.escape(reset_url)}">Reset your password</a></p>'
-            "<p>If you did not ask for a reset, you can ignore this email.</p>"
-        )
-        self._session.add(
-            EmailOutbox(
-                to_address=user.email,
-                template=RESET_TEMPLATE,
-                context={"name": user.name, "reset_url": reset_url, "expires_minutes": minutes},
-                subject="Reset your password",
-                body_text=body_text,
-                body_html=body_html,
-                next_attempt_at=now,
-                created_at=now,
-            )
+    def _enqueue_reset_email(self, user: User, raw_token: str) -> None:
+        enqueue_email(
+            self._session,
+            self._clock,
+            user.email,
+            RESET_TEMPLATE,
+            {
+                "name": user.name,
+                "token": raw_token,
+                "expires_minutes": int(RESET_TOKEN_LIFETIME.total_seconds() // 60),
+            },
         )

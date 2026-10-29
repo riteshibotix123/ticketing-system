@@ -18,7 +18,7 @@ from app.models import Base
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 FROZEN_NOW = datetime(2026, 10, 27, 4, 30, tzinfo=UTC)
 MIGRATION_SEEDED_TABLES = frozenset({"policy_versions"})
-IMMUTABLE_TABLES = frozenset({"ticket_events"})
+IMMUTABLE_TABLES = frozenset({"audit_log", "ticket_events"})
 
 
 @pytest.fixture(scope="session")

@@ -11,9 +11,11 @@ from app.core.clock import Clock
 from app.core.config import Environment, Settings
 from app.core.enums import ScanStatus
 from app.core.security import create_access_token
+from app.integrations.scanner import NoopScanner
 from app.integrations.storage import LocalStorage, StorageError
 from app.models import Attachment, AuditLog, User
-from app.services.attachments import sanitize_file_name
+from app.policy.actors import load_actor
+from app.services.attachments import AttachmentService, sanitize_file_name
 from tests.factories import (
     TicketWorld,
     make_department,
@@ -299,3 +301,26 @@ def test_download_unknown_is_404(
 ) -> None:
     user = make_user(db, make_department(db, "IT"))
     assert download(client, db, user, clock, settings, attachment_id).status_code == 404
+
+
+def test_failed_insert_removes_the_stored_file(
+    db: Session,
+    clock: Clock,
+    settings: Settings,
+    world: TicketWorld,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    actor = load_actor(db, world.users["requester"].id)
+    assert actor is not None
+    service = AttachmentService(
+        db, clock, settings, LocalStorage(settings.attachment_dir), NoopScanner()
+    )
+
+    def broken_flush() -> None:
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(db, "flush", broken_flush)
+    with pytest.raises(RuntimeError):
+        service.upload(actor, "report.pdf", "application/pdf", io.BytesIO(PDF))
+
+    assert not any(path.is_file() for path in settings.attachment_dir.rglob("*"))

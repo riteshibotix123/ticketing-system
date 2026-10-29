@@ -1,11 +1,10 @@
 import threading
-from collections.abc import Iterator
 from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
-from sqlalchemy import Engine, select, text
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock, FrozenClock
@@ -343,21 +342,13 @@ def test_list_filters_by_status(
     assert client.get(ACTIONS, params={"status": "bogus"}, headers=headers).status_code == 422
 
 
-@pytest.fixture
-def committed(committed_db: Session, migrated_engine: Engine) -> Iterator[Session]:
-    yield committed_db
-    committed_db.close()
-    with migrated_engine.begin() as connection:
-        connection.execute(text('TRUNCATE "audit_log"'))
-
-
 def test_concurrent_double_approval(
-    committed: Session, migrated_engine: Engine, clock: FrozenClock
+    committed_db: Session, migrated_engine: Engine, clock: FrozenClock
 ) -> None:
-    department = make_department(committed, "IT")
-    requester, target, first, second = super_admins(committed, department, 4)
-    request = make_protected_action(committed, target, requester)
-    committed.commit()
+    department = make_department(committed_db, "IT")
+    requester, target, first, second = super_admins(committed_db, department, 4)
+    request = make_protected_action(committed_db, target, requester)
+    committed_db.commit()
     barrier = threading.Barrier(2)
     outcomes: list[str] = []
     lock = threading.Lock()
@@ -383,12 +374,12 @@ def test_concurrent_double_approval(
     for thread in threads:
         thread.join(timeout=30)
     assert sorted(outcomes) == ["approved", "conflict"]
-    committed.expire_all()
-    stored = committed.get(ProtectedActionRequest, request.id)
+    committed_db.expire_all()
+    stored = committed_db.get(ProtectedActionRequest, request.id)
     assert stored is not None
     assert stored.status is ProtectedActionStatus.APPROVED
-    deactivations = committed.scalars(
+    deactivations = committed_db.scalars(
         select(AuditLog).where(AuditLog.action == "user_deactivated")
     ).all()
     assert len(deactivations) == 1
-    committed.rollback()
+    committed_db.rollback()

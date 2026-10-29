@@ -1,11 +1,10 @@
 import threading
 import uuid
-from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import IST, FrozenClock
@@ -235,21 +234,13 @@ def test_digest_job_runs_before_the_outbox() -> None:
     assert names.index("digest") < names.index("send_outbox")
 
 
-@pytest.fixture
-def committed(committed_db: Session, migrated_engine: Engine) -> Iterator[Session]:
-    yield committed_db
-    committed_db.close()
-    with migrated_engine.begin() as connection:
-        connection.execute(text('TRUNCATE "audit_log"'))
-
-
 def test_two_workers_send_one_digest(
-    committed: Session, migrated_engine: Engine, clock: FrozenClock, settings: Settings
+    committed_db: Session, migrated_engine: Engine, clock: FrozenClock, settings: Settings
 ) -> None:
-    desk = build_desk(committed)
-    prefer(committed, desk.user, NonCriticalEmail.DAILY_DIGEST)
-    notify(committed, desk.user, desk.ticket, "Status moved")
-    committed.commit()
+    desk = build_desk(committed_db)
+    prefer(committed_db, desk.user, NonCriticalEmail.DAILY_DIGEST)
+    notify(committed_db, desk.user, desk.ticket, "Status moved")
+    committed_db.commit()
     clock.set(ist(27, 12))
     context = JobContext(clock=clock, settings=settings, sender=InMemorySender())
     barrier = threading.Barrier(2, timeout=30)
@@ -275,5 +266,5 @@ def test_two_workers_send_one_digest(
         thread.join(timeout=60)
     assert errors == []
     assert sorted(results) == [0, 1]
-    assert len(outbox(committed, "notification_digest")) == 1
-    assert count(committed, NotificationDigest) == 1
+    assert len(outbox(committed_db, "notification_digest")) == 1
+    assert count(committed_db, NotificationDigest) == 1

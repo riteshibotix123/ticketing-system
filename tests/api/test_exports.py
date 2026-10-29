@@ -286,3 +286,23 @@ def test_formula_like_titles_are_neutralised(
     )
     row = next(row for row in rows if row[:1] == [ticket.ticket_no])
     assert row[1] == "'=cmd|' /C calc'!A0"
+
+
+def test_dates_without_a_time_zone_are_read_as_utc(
+    client: TestClient, db: Session, clock: FrozenClock, settings: Settings, world: TicketWorld
+) -> None:
+    admin = world.users["admin"]
+    base = {"type": "tickets", "format": "csv", "scope": "all"}
+    naive = export(
+        client, db, clock, settings, admin, {**base, "created_from": "2026-10-01T00:00:00"}
+    )
+    aware = export(
+        client, db, clock, settings, admin, {**base, "created_from": "2026-10-01T00:00:00Z"}
+    )
+
+    naive_rows = csv_rows(naive)
+    assert exported_numbers(naive_rows) == exported_numbers(csv_rows(aware))
+    assert naive_rows[3] == [
+        "Filters",
+        "scope=all; sort=urgency; created_from=2026-10-01T00:00:00Z",
+    ]

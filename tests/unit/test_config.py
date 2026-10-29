@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 from pydantic import SecretStr, ValidationError
 
 from app.core.config import Environment, Settings, get_settings
@@ -86,6 +87,29 @@ def test_prod_rejects_scaled_sla_time() -> None:
             cookie_secure=True,
             sla_time_scale=0.0166667,
         )
+
+
+@pytest.mark.parametrize("key", ["", "not-a-fernet-key"])
+def test_prod_mfa_requires_valid_encryption_key(key: str) -> None:
+    with pytest.raises(ValidationError, match="FIELD_ENCRYPTION_KEY"):
+        Settings(
+            env=Environment.PROD,
+            jwt_secret=STRONG_SECRET,
+            cookie_secure=True,
+            mfa_required_roles=["admin"],
+            field_encryption_key=SecretStr(key),
+        )
+
+
+def test_prod_mfa_accepts_valid_encryption_key() -> None:
+    settings = Settings(
+        env=Environment.PROD,
+        jwt_secret=STRONG_SECRET,
+        cookie_secure=True,
+        mfa_required_roles=["admin"],
+        field_encryption_key=SecretStr(Fernet.generate_key().decode()),
+    )
+    assert settings.mfa_enabled is True
 
 
 def test_non_prod_allows_scaled_sla_time() -> None:

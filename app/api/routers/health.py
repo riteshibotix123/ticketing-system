@@ -9,8 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import ClockDep, SettingsDep
 from app.core.db import get_db
-from app.models.notification import WorkerHeartbeat
-from app.worker.main import HEARTBEAT_NAME
+from app.models.notification import HEARTBEAT_NAME, WorkerHeartbeat
 
 STALE_AFTER_TICKS: Final = 3
 

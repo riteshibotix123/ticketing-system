@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import CurrentActor, DbSession
+from app.core.clock import assume_utc
 from app.core.pagination import PageParams
 from app.schemas.audit import AuditEntryOut
 from app.schemas.common import Page
@@ -34,6 +35,6 @@ def list_audit(
         actor_id=actor_id,
         action=action,
         ticket_id=ticket_id,
-        created_from=created_from,
-        created_to=created_to,
+        created_from=assume_utc(created_from),
+        created_to=assume_utc(created_to),
     )

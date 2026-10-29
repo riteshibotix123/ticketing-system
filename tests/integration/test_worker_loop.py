@@ -8,11 +8,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.clock import FrozenClock
 from app.core.config import Settings
+from app.core.events import EscalationRaised, EventBus, SlaWarningRaised, TicketClosed, bus
 from app.integrations.email import InMemorySender
 from app.models import EmailOutbox, EmailStatus, WorkerHeartbeat
+from app.models.notification import HEARTBEAT_NAME
+from app.services.handlers import register_all
 from app.worker import Job, JobContext
+from app.worker import main as worker_main
 from app.worker.jobs import registered_jobs
-from app.worker.main import HEARTBEAT_NAME, Worker, install_signal_handlers
+from app.worker.main import Worker, install_signal_handlers
 from tests.factories import make_outbox_email
 
 
@@ -151,3 +155,20 @@ def test_sigterm_stops_worker(session_factory: Callable[[], Session], context: J
         signal.signal(signal.SIGINT, original_int)
 
     assert worker.stopping
+
+
+def test_main_registers_event_handlers(monkeypatch: pytest.MonkeyPatch, settings: Settings) -> None:
+    started: list[Worker] = []
+    monkeypatch.setattr(worker_main, "configure_logging", lambda: None)
+    monkeypatch.setattr(worker_main, "get_settings", lambda: settings)
+    monkeypatch.setattr(worker_main, "install_signal_handlers", lambda _worker: None)
+    monkeypatch.setattr(Worker, "run_forever", lambda self: started.append(self))
+    expected = EventBus()
+    register_all(expected)
+    bus.clear()
+
+    worker_main.main()
+
+    assert len(started) == 1
+    for event_type in (SlaWarningRaised, EscalationRaised, TicketClosed):
+        assert bus.handler_count(event_type) == expected.handler_count(event_type) > 0

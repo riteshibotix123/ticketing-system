@@ -1,9 +1,9 @@
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import FrozenClock
@@ -33,14 +33,6 @@ type JobRun = Callable[[Session, JobContext], int]
 @pytest.fixture(autouse=True)
 def handlers() -> None:
     register_all()
-
-
-@pytest.fixture
-def committed(committed_db: Session, migrated_engine: Engine) -> Iterator[Session]:
-    yield committed_db
-    committed_db.close()
-    with migrated_engine.begin() as connection:
-        connection.execute(text('TRUNCATE "audit_log"'))
 
 
 def context_at(clock: FrozenClock, settings: Settings, hours: float) -> JobContext:
@@ -109,29 +101,29 @@ def test_scan_twice_records_each_step_once(
 
 
 def test_concurrent_scans_escalate_once(
-    committed: Session, migrated_engine: Engine, clock: FrozenClock, settings: Settings
+    committed_db: Session, migrated_engine: Engine, clock: FrozenClock, settings: Settings
 ) -> None:
-    new_ticket(committed)
-    committed.commit()
+    new_ticket(committed_db)
+    committed_db.commit()
     results = run_concurrently(migrated_engine, sla_scan.run, context_at(clock, settings, 25))
     assert sorted(results) == [0, 1]
-    assert escalation_count(committed) == 2
-    assert notification_count(committed, "sla_warning") == 1
-    assert notification_count(committed, "escalation") == 2
+    assert escalation_count(committed_db) == 2
+    assert notification_count(committed_db, "sla_warning") == 1
+    assert notification_count(committed_db, "escalation") == 2
 
 
 def test_concurrent_auto_close_closes_once(
-    committed: Session, migrated_engine: Engine, clock: FrozenClock, settings: Settings
+    committed_db: Session, migrated_engine: Engine, clock: FrozenClock, settings: Settings
 ) -> None:
-    ticket = new_ticket(committed)
+    ticket = new_ticket(committed_db)
     ticket.status = TicketStatus.RESOLVED
     ticket.resolved_at = T0
-    publish(committed, TicketResolved(actor_id=None, occurred_at=T0, ticket_id=ticket.id))
-    committed.commit()
+    publish(committed_db, TicketResolved(actor_id=None, occurred_at=T0, ticket_id=ticket.id))
+    committed_db.commit()
     results = run_concurrently(migrated_engine, auto_close.run, context_at(clock, settings, 24 * 8))
     assert sorted(results) == [0, 1]
-    committed.expire_all()
-    closed = committed.scalar(
+    committed_db.expire_all()
+    closed = committed_db.scalar(
         select(func.count())
         .select_from(TicketEvent)
         .where(TicketEvent.ticket_id == ticket.id, TicketEvent.action == "closed")
@@ -140,14 +132,14 @@ def test_concurrent_auto_close_closes_once(
 
 
 def test_concurrent_reminders_notify_once(
-    committed: Session, migrated_engine: Engine, clock: FrozenClock, settings: Settings
+    committed_db: Session, migrated_engine: Engine, clock: FrozenClock, settings: Settings
 ) -> None:
-    ticket = new_ticket(committed)
+    ticket = new_ticket(committed_db)
     ticket.status = TicketStatus.AWAITING_REQUESTER
     ticket.awaiting_since = T0
-    timers = Timers(committed, ticket, PolicyService(committed).current(), 1.0)
+    timers = Timers(committed_db, ticket, PolicyService(committed_db).current(), 1.0)
     timers.start_requester_reminder(T0)
-    committed.commit()
+    committed_db.commit()
     results = run_concurrently(migrated_engine, reminders.run, context_at(clock, settings, 49))
     assert sorted(results) == [0, 1]
-    assert notification_count(committed, "requester_reminder") == 1
+    assert notification_count(committed_db, "requester_reminder") == 1

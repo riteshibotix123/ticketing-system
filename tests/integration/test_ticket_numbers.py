@@ -1,9 +1,7 @@
 import threading
-from collections.abc import Iterator
 from datetime import UTC, datetime
 
-import pytest
-from sqlalchemy import Engine, create_engine, select, text
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import FrozenClock
@@ -50,21 +48,13 @@ def test_continues_existing_counter(db: Session) -> None:
     assert TicketNumberService(db).next_number("IT", FACTORY_NOW) == "IBX-IT-2026-000042"
 
 
-@pytest.fixture
-def committed(committed_db: Session, migrated_engine: Engine) -> Iterator[Session]:
-    yield committed_db
-    committed_db.close()
-    with migrated_engine.begin() as connection:
-        connection.execute(text('TRUNCATE "audit_log"'))
-
-
 def test_concurrent_creations_get_unique_numbers(
-    committed: Session, test_database_url: str
+    committed_db: Session, test_database_url: str
 ) -> None:
-    it = make_department(committed, "IT")
-    make_spoke_assignment(committed, make_user(committed, it), it)
-    requesters = [make_user(committed, it) for _ in range(THREADS)]
-    committed.commit()
+    it = make_department(committed_db, "IT")
+    make_spoke_assignment(committed_db, make_user(committed_db, it), it)
+    requesters = [make_user(committed_db, it) for _ in range(THREADS)]
+    committed_db.commit()
     engine = create_engine(test_database_url, pool_size=THREADS, max_overflow=0)
     barrier = threading.Barrier(THREADS, timeout=60)
     errors: list[BaseException] = []
@@ -98,5 +88,5 @@ def test_concurrent_creations_get_unique_numbers(
         thread.join()
     engine.dispose()
     assert errors == []
-    numbers = sorted(committed.scalars(select(Ticket.ticket_no)))
+    numbers = sorted(committed_db.scalars(select(Ticket.ticket_no)))
     assert numbers == [f"IBX-IT-2026-{value:06d}" for value in range(1, THREADS + 1)]

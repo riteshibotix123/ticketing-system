@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import AwareDatetime
 
 from app.api.deps import ClockDep, CurrentActor, DbSession
-from app.api.routers.tickets import TicketListParams
+from app.api.params import TicketListParams
 from app.schemas.exports import ExportFormat, ExportType
 from app.services.exports import ExportService
 

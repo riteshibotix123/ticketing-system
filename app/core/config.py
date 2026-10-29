@@ -3,6 +3,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
+from cryptography.fernet import Fernet
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
@@ -95,11 +96,21 @@ class Settings(BaseSettings):
             raise ValueError("COOKIE_SECURE must be true in prod")
         if self.sla_time_scale != 1.0:
             raise ValueError("SLA_TIME_SCALE must be exactly 1.0 in prod")
+        if self.mfa_required_roles and not _is_fernet_key(self.field_encryption_key):
+            raise ValueError("FIELD_ENCRYPTION_KEY must be a valid Fernet key when MFA is enabled")
         return self
 
     @property
     def mfa_enabled(self) -> bool:
         return bool(self.mfa_required_roles)
+
+
+def _is_fernet_key(value: SecretStr) -> bool:
+    try:
+        Fernet(value.get_secret_value().encode())
+    except ValueError:
+        return False
+    return True
 
 
 @lru_cache(maxsize=1)

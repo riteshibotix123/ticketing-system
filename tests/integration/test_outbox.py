@@ -192,3 +192,61 @@ def test_two_concurrent_workers_never_send_a_row_twice(
     committed_db.expire_all()
     statuses = committed_db.scalars(select(EmailOutbox.status)).all()
     assert statuses == [EmailStatus.SENT] * total
+
+
+def test_one_time_token_is_redacted_once_sent(db: Session, clock: FrozenClock) -> None:
+    row = enqueue_email(
+        db,
+        clock,
+        "asha@ibotix.ai",
+        "verify_email",
+        {"name": "Asha", "token": "secret-token-1", "expires_hours": 24},
+    )
+    sender = InMemorySender()
+
+    assert send_outbox(db, clock, sender) == 1
+
+    assert "secret-token-1" in sender.sent[0].body_text
+    db.refresh(row)
+    assert row.status is EmailStatus.SENT
+    assert row.context == {"name": "Asha", "token": "[redacted]", "expires_hours": 24}
+    assert "secret-token-1" not in row.body_text
+    assert "secret-token-1" not in row.body_html
+    assert "token=[redacted]" in row.body_text
+
+
+def test_one_time_token_is_redacted_after_final_failure(db: Session, clock: FrozenClock) -> None:
+    row = enqueue_email(
+        db,
+        clock,
+        "asha@ibotix.ai",
+        "password_reset",
+        {"name": "Asha", "token": "secret-token-2", "expires_minutes": 60},
+    )
+    row.attempts = MAX_ATTEMPTS - 1
+    db.flush()
+
+    assert send_outbox(db, clock, FailingSender(failures=1)) == 1
+
+    db.refresh(row)
+    assert row.status is EmailStatus.FAILED
+    assert row.context["token"] == "[redacted]"
+    assert "secret-token-2" not in row.body_text
+    assert "secret-token-2" not in row.body_html
+
+
+def test_pending_retry_keeps_the_token(db: Session, clock: FrozenClock) -> None:
+    row = enqueue_email(
+        db,
+        clock,
+        "asha@ibotix.ai",
+        "password_reset",
+        {"name": "Asha", "token": "secret-token-3", "expires_minutes": 60},
+    )
+
+    assert send_outbox(db, clock, FailingSender(failures=1)) == 1
+
+    db.refresh(row)
+    assert row.status is EmailStatus.PENDING
+    assert row.context["token"] == "secret-token-3"
+    assert "secret-token-3" in row.body_text

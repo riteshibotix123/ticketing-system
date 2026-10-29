@@ -41,5 +41,11 @@ def get_clock() -> Clock:
     return _system_clock
 
 
+def assume_utc(value: datetime | None) -> datetime | None:
+    if value is None or value.utcoffset() is not None:
+        return value
+    return value.replace(tzinfo=UTC)
+
+
 def to_ist(value: datetime) -> datetime:
     return _require_aware(value).astimezone(IST)

@@ -1,13 +1,13 @@
 import threading
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
-from sqlalchemy import Engine, create_engine, select, text
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock, FrozenClock
@@ -438,24 +438,14 @@ def test_assign_from_reopened_starts_work_cycle(
     assert progress.stopped_at is None
 
 
-@pytest.fixture
-def committed(committed_db: Session, migrated_engine: Engine) -> Iterator[Session]:
-    with migrated_engine.begin() as connection:
-        connection.execute(text('TRUNCATE "audit_log"'))
-    yield committed_db
-    committed_db.close()
-    with migrated_engine.begin() as connection:
-        connection.execute(text('TRUNCATE "audit_log"'))
-
-
-def test_concurrent_acknowledgements(committed: Session, test_database_url: str) -> None:
+def test_concurrent_acknowledgements(committed_db: Session, test_database_url: str) -> None:
     register_all()
-    it = make_department(committed, "IT")
-    spokes = [make_user(committed, it) for _ in range(2)]
+    it = make_department(committed_db, "IT")
+    spokes = [make_user(committed_db, it) for _ in range(2)]
     for spoke in spokes:
-        make_spoke_assignment(committed, spoke, it)
-    ticket = make_ticket(committed, make_user(committed, it), it)
-    committed.commit()
+        make_spoke_assignment(committed_db, spoke, it)
+    ticket = make_ticket(committed_db, make_user(committed_db, it), it)
+    committed_db.commit()
     engine = create_engine(test_database_url, pool_size=2, max_overflow=0)
     barrier = threading.Barrier(2, timeout=60)
     outcomes: list[str] = []
@@ -485,9 +475,9 @@ def test_concurrent_acknowledgements(committed: Session, test_database_url: str)
         thread.join()
     engine.dispose()
     assert sorted(outcomes) == sorted(["ok", ErrorCode.INVALID_TRANSITION.value])
-    committed.expire_all()
-    stored = committed.get(Ticket, ticket.id)
+    committed_db.expire_all()
+    stored = committed_db.get(Ticket, ticket.id)
     assert stored is not None
     assert stored.status is TicketStatus.ACKNOWLEDGED
     assert stored.owner_id in {spoke.id for spoke in spokes}
-    assert len(events_of(committed, stored)) == 1
+    assert len(events_of(committed_db, stored)) == 1

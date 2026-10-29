@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterator
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import Engine, create_engine, select, text
+from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import FrozenClock
@@ -30,12 +30,9 @@ TIMEOUT = 60
 
 
 @pytest.fixture
-def committed(committed_db: Session, migrated_engine: Engine) -> Iterator[Session]:
+def committed(committed_db: Session) -> Session:
     register_all()
-    yield committed_db
-    committed_db.close()
-    with migrated_engine.begin() as connection:
-        connection.execute(text('TRUNCATE "audit_log"'))
+    return committed_db
 
 
 @pytest.fixture

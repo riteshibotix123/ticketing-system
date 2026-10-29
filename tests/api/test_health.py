@@ -10,7 +10,7 @@ from app.core.config import Settings
 from app.core.logging import JsonFormatter
 from app.core.security import create_access_token
 from app.models import WorkerHeartbeat
-from app.worker.main import HEARTBEAT_NAME
+from app.models.notification import HEARTBEAT_NAME
 from tests.factories import make_department, make_user
 
 
