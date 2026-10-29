@@ -1,0 +1,7 @@
+<p>Hello {{ name }},</p>
+<p>Here is your notification digest for {{ date }} ({{ count }} new).</p>
+<ul>
+{% for item in items %}<li>{% if item.ticket_id %}<a href="{{ frontend_base_url }}/tickets/{{ item.ticket_id }}">{{ item.text }}</a>{% else %}{{ item.text }}{% endif %}</li>
+{% endfor %}</ul>
+{% if more %}<p>and {{ more }} more</p>
+{% endif %}<p><a href="{{ frontend_base_url }}/login">Sign in</a> to see every notification.</p>

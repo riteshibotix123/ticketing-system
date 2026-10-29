@@ -1,0 +1,4 @@
+{% extends "_ticket.html.j2" %}
+{% block detail %}<p>Owner: {{ owner }}<br>
+{% if eta %}ETA: {{ eta }}{% else %}Next update by: {{ next_update }}{% endif %}</p>
+{% endblock %}

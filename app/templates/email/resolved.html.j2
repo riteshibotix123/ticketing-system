@@ -1,0 +1,4 @@
+{% extends "_ticket.html.j2" %}
+{% block detail %}<p>Resolution: {{ summary }}</p>
+<p>Please <a href="{{ frontend_base_url }}/tickets/{{ ticket_id }}">confirm the resolution or reopen the ticket</a>.</p>
+{% endblock %}

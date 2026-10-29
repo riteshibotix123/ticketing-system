@@ -1,0 +1,5 @@
+{% extends "_ticket.txt.j2" %}
+{% block detail %}
+Owner: {{ owner }}
+{% if eta %}ETA: {{ eta }}{% else %}Next update by: {{ next_update }}{% endif %}
+{% endblock %}

@@ -1,0 +1,4 @@
+<p>Hello {{ name }},</p>
+<p>Your Ibotix Helpdesk signup request was not approved.</p>
+{% if reason %}<p>Reason: {{ reason }}</p>
+{% endif %}<p>You can reapply from the <a href="{{ frontend_base_url }}/login">sign-in page</a>.</p>

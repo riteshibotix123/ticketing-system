@@ -1,0 +1,11 @@
+Hello {{ name }},
+
+{{ text }}
+{% block detail %}{% endblock %}
+Ticket: {{ ticket_id }}
+Title: {{ title }}
+Department: {{ department }}
+Status: {{ status }}
+Priority: {{ priority }}
+
+Open the ticket: {{ frontend_base_url }}/tickets/{{ ticket_id }}

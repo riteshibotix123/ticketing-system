@@ -1,0 +1,10 @@
+<p>Hello {{ name }},</p>
+<p>{{ text }}</p>
+{% block detail %}{% endblock %}<ul>
+<li>Ticket: {{ ticket_id }}</li>
+<li>Title: {{ title }}</li>
+<li>Department: {{ department }}</li>
+<li>Status: {{ status }}</li>
+<li>Priority: {{ priority }}</li>
+</ul>
+<p><a href="{{ frontend_base_url }}/tickets/{{ ticket_id }}">Open the ticket</a></p>

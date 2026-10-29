@@ -1,0 +1,7 @@
+Hello {{ name }},
+
+Please confirm your email address to continue your Ibotix Helpdesk signup. The link expires in {{ expires_hours }} hours.
+
+{{ frontend_base_url }}/verify-email?token={{ token | urlencode }}
+
+If you did not sign up, you can ignore this email.

@@ -1,0 +1,4 @@
+{% extends "_ticket.txt.j2" %}
+{% block detail %}
+{% if is_extension %}The ETA was extended{% else %}The ETA was changed{% endif %}{% if old_eta %} from {{ old_eta }}{% endif %} to {{ new_eta }}.
+{% endblock %}

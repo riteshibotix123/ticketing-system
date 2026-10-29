@@ -1,0 +1,7 @@
+Hello {{ name }},
+
+Your Ibotix Helpdesk signup request was not approved.
+{% if reason %}
+Reason: {{ reason }}
+{% endif %}
+You can reapply from the sign-in page: {{ frontend_base_url }}/login

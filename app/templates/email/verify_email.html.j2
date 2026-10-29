@@ -1,0 +1,4 @@
+<p>Hello {{ name }},</p>
+<p>Please confirm your email address to continue your Ibotix Helpdesk signup. The link expires in {{ expires_hours }} hours.</p>
+<p><a href="{{ frontend_base_url }}/verify-email?token={{ token | urlencode }}">Verify your email address</a></p>
+<p>If you did not sign up, you can ignore this email.</p>

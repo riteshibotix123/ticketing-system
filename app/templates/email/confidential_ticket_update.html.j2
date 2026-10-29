@@ -1,0 +1,9 @@
+<p>Hello {{ name }},</p>
+<p>There is an update on a confidential ticket.</p>
+<ul>
+<li>Ticket: {{ ticket_id }}</li>
+<li>Department: {{ department }}</li>
+<li>Status: {{ status }}</li>
+<li>Priority: {{ priority }}</li>
+</ul>
+<p><a href="{{ frontend_base_url }}/tickets/{{ ticket_id }}">Open the ticket</a></p>

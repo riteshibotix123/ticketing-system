@@ -1,0 +1,116 @@
+name: ibotix-full
+
+x-app-env: &app-env
+  ENV: ${ENV:-dev}
+  DATABASE_URL: postgresql+psycopg://ibotix_app:${APP_DB_PASSWORD:-ibotix_app_dev}@db:5432/ibotix
+  JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-before-any-real-use}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:4173}
+  FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+  ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-ibotix.ai}
+  SMTP_HOST: mailpit
+  SMTP_PORT: "1025"
+  SMTP_FROM: ${SMTP_FROM:-helpdesk@ibotix.ai}
+  SLA_TIME_SCALE: ${SLA_TIME_SCALE:-1.0}
+  WORKER_TICK_SECONDS: ${WORKER_TICK_SECONDS:-15}
+  MFA_REQUIRED_ROLES: ${MFA_REQUIRED_ROLES:-}
+  FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:-}
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ibotix
+      POSTGRES_PASSWORD: ${OWNER_DB_PASSWORD:-ibotix_owner_dev}
+      POSTGRES_DB: ibotix
+    volumes:
+      - full_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ibotix -d ibotix"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8026:8025"
+
+  migrate:
+    build: .
+    image: ibotix-backend:local
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql+psycopg://ibotix:${OWNER_DB_PASSWORD:-ibotix_owner_dev}@db:5432/ibotix
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db-roles:
+    image: postgres:16
+    environment:
+      PGHOST: db
+      PGUSER: ibotix
+      PGDATABASE: ibotix
+      PGPASSWORD: ${OWNER_DB_PASSWORD:-ibotix_owner_dev}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-ibotix_app_dev}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        psql -v ON_ERROR_STOP=1 -v app_password="$$APP_DB_PASSWORD" <<'SQL'
+        SELECT 'CREATE ROLE ibotix_app LOGIN'
+        WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ibotix_app') \gexec
+        ALTER ROLE ibotix_app WITH LOGIN PASSWORD :'app_password';
+        GRANT CONNECT ON DATABASE ibotix TO ibotix_app;
+        GRANT USAGE ON SCHEMA public TO ibotix_app;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ibotix_app;
+        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ibotix_app;
+        REVOKE UPDATE, DELETE, TRUNCATE ON audit_log, ticket_events FROM ibotix_app;
+        REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON alembic_version FROM ibotix_app;
+        SQL
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    image: ibotix-backend:local
+    environment: *app-env
+    ports:
+      - "8000:8000"
+    volumes:
+      - full_attachments:/app/var/attachments
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    image: ibotix-backend:local
+    command: ["python", "-m", "app.worker"]
+    environment: *app-env
+    volumes:
+      - full_attachments:/app/var/attachments
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://api:8000/health/worker', timeout=3).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  full_db_data:
+  full_attachments:

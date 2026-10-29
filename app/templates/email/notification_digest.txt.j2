@@ -1,0 +1,8 @@
+Hello {{ name }},
+
+Here is your notification digest for {{ date }} ({{ count }} new).
+
+{% for item in items %}- {{ item.text }}{% if item.ticket_id %} ({{ frontend_base_url }}/tickets/{{ item.ticket_id }}){% endif %}
+{% endfor %}{% if more %}and {{ more }} more
+{% endif %}
+Sign in to see every notification: {{ frontend_base_url }}/login
