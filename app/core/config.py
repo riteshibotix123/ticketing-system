@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     env: Environment = Environment.DEV
     database_url: str = "postgresql+psycopg://ibotix:ibotix@localhost:5433/ibotix"
     test_database_url: str = "postgresql+psycopg://ibotix:ibotix@localhost:5433/ibotix_test"
+    redis_url: str = ""
+    test_redis_url: str = "redis://localhost:6379/15"
+    celery_broker_url: str = "redis://localhost:6379/1"
+    celery_drain_fanout: int = Field(default=4, ge=1, le=64)
     jwt_secret: SecretStr = SecretStr("dev-insecure-jwt-secret")
     access_token_minutes: int = Field(default=15, ge=1)
     refresh_token_days: int = Field(default=7, ge=1)

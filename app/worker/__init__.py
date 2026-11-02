@@ -19,3 +19,4 @@ class JobContext:
 class Job:
     name: str
     run: Callable[[Session, JobContext], int]
+    batch_size: int | None = None

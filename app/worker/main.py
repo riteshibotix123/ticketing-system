@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.clock import SystemClock
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.db import SessionLocal
 from app.core.logging import configure_logging
 from app.core.types import JsonObject, JsonValue
@@ -37,6 +37,16 @@ class Worker:
         self._stop = threading.Event()
 
     @property
+    def jobs(self) -> list[Job]:
+        return list(self._jobs)
+
+    def job(self, name: str) -> Job:
+        for job in self._jobs:
+            if job.name == name:
+                return job
+        raise KeyError(name)
+
+    @property
     def stopping(self) -> bool:
         return self._stop.is_set()
 
@@ -55,11 +65,11 @@ class Worker:
         for job in self._jobs:
             if self._stop.is_set():
                 break
-            results[job.name] = self._run_job(job)
+            results[job.name] = self.run_job(job)
         self._beat(results)
         return results
 
-    def _run_job(self, job: Job) -> int | None:
+    def run_job(self, job: Job) -> int | None:
         started = time.perf_counter()
         with self._session_factory() as session:
             try:
@@ -121,12 +131,15 @@ def install_signal_handlers(worker: Worker) -> None:
     signal.signal(signal.SIGINT, handle)
 
 
+def build_worker(settings: Settings) -> Worker:
+    context = JobContext(clock=SystemClock(), settings=settings, sender=build_sender(settings))
+    return Worker(SessionLocal, context, registered_jobs(), settings.worker_tick_seconds)
+
+
 def main() -> None:
     configure_logging()
     register_all()
-    settings = get_settings()
-    context = JobContext(clock=SystemClock(), settings=settings, sender=build_sender(settings))
-    worker = Worker(SessionLocal, context, registered_jobs(), settings.worker_tick_seconds)
+    worker = build_worker(get_settings())
     install_signal_handlers(worker)
     worker.run_forever()
 

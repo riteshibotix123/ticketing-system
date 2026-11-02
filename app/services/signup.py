@@ -74,7 +74,7 @@ class SignupService:
         self._clock = clock
         self._settings = settings
         self._audit = AuditService(session, clock)
-        self._limiter = RateLimiter(session, clock)
+        self._limiter = RateLimiter(session, clock, settings)
 
     def signup(self, body: SignupBody) -> SignupAccepted | ApiError:
         self._check_domain(body.email)

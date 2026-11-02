@@ -9,6 +9,9 @@ x-app-env: &app-env
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:4173}
   FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
   ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-ibotix.ai}
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_DRAIN_FANOUT: ${CELERY_DRAIN_FANOUT:-4}
   SMTP_HOST: mailpit
   SMTP_PORT: "1025"
   SMTP_FROM: ${SMTP_FROM:-helpdesk@ibotix.ai}
@@ -31,6 +34,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mailpit:
     image: axllent/mailpit:latest
@@ -88,11 +99,13 @@ services:
         condition: service_completed_successfully
       mailpit:
         condition: service_started
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   worker:
     image: ibotix-backend:local
-    command: ["python", "-m", "app.worker"]
+    command: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=${CELERY_CONCURRENCY:-8}"]
     environment: *app-env
     volumes:
       - full_attachments:/app/var/attachments
@@ -107,6 +120,19 @@ services:
       start_period: 60s
       retries: 3
     depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    image: ibotix-backend:local
+    command: ["celery", "-A", "app.worker.celery_app", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    environment: *app-env
+    depends_on:
+      redis:
+        condition: service_healthy
       api:
         condition: service_healthy
     restart: unless-stopped

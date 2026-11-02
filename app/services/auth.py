@@ -78,7 +78,7 @@ class AuthService:
         self._clock = clock
         self._settings = settings
         self._audit = AuditService(session, clock)
-        self._limiter = RateLimiter(session, clock)
+        self._limiter = RateLimiter(session, clock, settings)
         self._mfa = MfaService(session, clock, settings)
         self._me = MeService(session)
 

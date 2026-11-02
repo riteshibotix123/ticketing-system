@@ -6,7 +6,7 @@ FastAPI + PostgreSQL backend for the Ibotix internal helpdesk. The API contract 
 ## Requirements
 
 - Python 3.12
-- Docker (PostgreSQL 16 and Mailpit)
+- Docker (PostgreSQL 16, Redis 7 and Mailpit)
 
 ## Setup
 
@@ -15,11 +15,13 @@ python -m venv .venv
 .venv/Scripts/activate        # Windows (Git Bash); use .venv/bin/activate on Linux/macOS
 pip install -e ".[dev]"
 cp .env.example .env
-docker compose up -d db mailpit
+docker compose up -d db redis mailpit
 ```
 
 The database init script creates `ibotix` and `ibotix_test`. Mailpit receives mail on SMTP port
-1025 and shows it at http://localhost:8025.
+1025 and shows it at http://localhost:8025. Redis (port 6379) holds the login and signup
+rate-limit counters; set `REDIS_URL` empty to keep them in PostgreSQL instead. If Redis goes down,
+the API falls back to PostgreSQL by itself.
 
 ## Run
 
@@ -32,7 +34,10 @@ uvicorn app.main:app --reload
 - Business API: `/api/v1/...`
 - OpenAPI: http://localhost:8000/openapi.json (interactive docs at `/docs` outside `prod`)
 
-- Worker: `python -m app.worker` (heartbeat at `GET /health/worker`)
+- Background jobs (heartbeat at `GET /health/worker`), either Celery in two terminals:
+  `python -m celery -A app.worker.celery_app worker --loglevel=INFO --pool=threads --concurrency=8`
+  and `python -m celery -A app.worker.celery_app beat --loglevel=INFO`,
+  or the plain loop `python -m app.worker`.
 
 ## Gate (run after every part)
 
@@ -65,7 +70,7 @@ python -m scripts.perf_seed                 # 50,000 tickets and 200,000 events 
 ## Full stack in Docker
 
 ```bash
-docker compose -f docker-compose.full.yml up -d --build      # db, migrate, db-roles, api, worker, mailpit
+docker compose -f docker-compose.full.yml up -d --build      # db, redis, migrate, db-roles, api, worker (Celery), beat, mailpit
 docker compose -f docker-compose.full.yml run --rm api python -m app.cli seed
 ```
 
