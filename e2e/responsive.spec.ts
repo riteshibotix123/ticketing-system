@@ -14,7 +14,6 @@ const LINKS = [
   'Users',
   'Configuration',
   'Audit log',
-  'Reports',
 ] as const;
 
 test.describe('phone width (400px)', () => {

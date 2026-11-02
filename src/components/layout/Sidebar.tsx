@@ -1,10 +1,9 @@
-﻿import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Bell,
   ClipboardList,
   FilePlus2,
-  Gauge,
   LayoutDashboard,
   ScrollText,
   Settings2,
@@ -18,6 +17,7 @@ import { USE_MOCKS } from '@/lib/constants';
 import { sidebarFlags } from '@/lib/permissions';
 import { usePermissions } from '@/hooks/usePermissions';
 import { cn } from '@/lib/cn';
+import { BrandMark } from '@/components/common/BrandMark';
 
 interface NavItem {
   to: string;
@@ -84,22 +84,18 @@ export function Sidebar() {
       ? [{ to: '/config/departments', label: 'Configuration', icon: Settings2 }]
       : []),
     ...(flags.audit ? [{ to: '/audit', label: 'Audit log', icon: ScrollText }] : []),
-    ...(flags.reports ? [{ to: '/reports', label: 'Reports', icon: Gauge }] : []),
   ];
 
   return (
     <nav
       aria-label="Main navigation"
-      className="flex shrink-0 flex-col border-b border-line bg-surface nav:w-[236px] nav:border-b-0 nav:border-r"
+      className="flex shrink-0 flex-col border-b border-side-line bg-side text-side-fg nav:sticky nav:top-0 nav:h-dvh nav:w-[236px] nav:border-b-0 nav:border-r"
     >
-      <div className="flex items-center gap-2 px-3 py-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-accent font-mono text-[13px] font-semibold text-accent-fg">
-          IX
-        </span>
-        <span className="text-section-title text-fg">Ibotix Tickets</span>
+      <div className="flex items-center px-4 pb-3 pt-4 nav:pb-5">
+        <BrandMark tone="auto" />
       </div>
 
-      <div className="flex flex-wrap gap-1 px-3 pb-3 nav:flex-1 nav:flex-col nav:gap-0.5 nav:pb-0">
+      <div className="flex flex-wrap gap-1 px-3 pb-3 nav:flex-1 nav:flex-col nav:gap-1 nav:overflow-y-auto nav:pb-0">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -109,10 +105,10 @@ export function Sidebar() {
               end={item.end}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2 rounded px-2.5 py-2 text-body transition-colors',
+                  'relative flex items-center gap-2.5 rounded-md px-3 py-2 text-body transition-colors',
                   isActive
-                    ? 'bg-accent-soft font-medium text-accent'
-                    : 'text-muted hover:bg-surface-2 hover:text-fg',
+                    ? 'bg-side-active font-semibold text-side-active-fg before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-side-marker'
+                    : 'text-side-muted hover:bg-side-hover hover:text-side-fg',
                 )
               }
             >
@@ -125,11 +121,10 @@ export function Sidebar() {
       </div>
 
       <div className="hidden px-4 pb-4 nav:block">
-        <p className="text-muted/80 text-small">
+        <p className="text-small text-side-muted">
           {USE_MOCKS ? 'Demo data. Nothing leaves this page.' : 'Internal use only.'}
         </p>
       </div>
     </nav>
   );
 }
-

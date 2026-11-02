@@ -101,7 +101,7 @@ function PolicySummary({ policy }: { policy: PolicyConfig }) {
     {
       label: 'SLA mode',
       value: policy.sla_mode === 'calendar' ? 'Calendar hours' : 'Business hours',
-      note: 'Business-hours mode is not active yet.',
+      note: 'How SLA deadlines are counted.',
     },
   ];
 

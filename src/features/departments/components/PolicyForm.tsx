@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Lock } from 'lucide-react';
@@ -9,13 +9,6 @@ import { queryKeys } from '@/api/queryKeys';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/useToast';
 import { PRIORITY_LABEL, PRIORITY_ORDER } from '@/lib/constants';
 import { policyFormSchema, type PolicyFormInput } from '@/lib/zod-schemas';
@@ -35,7 +28,7 @@ export function PolicyForm({ policy, readOnly }: { policy: PolicyConfig; readOnl
   const [pendingNext, setPendingNext] = useState<PolicyConfig | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const { register, handleSubmit, control, formState, reset } = useForm<PolicyFormInput>({
+  const { register, handleSubmit, formState, reset } = useForm<PolicyFormInput>({
     resolver: zodResolver(policyFormSchema),
     defaultValues: {
       initial_response_hours: policy.initial_response_hours,
@@ -137,25 +130,6 @@ export function PolicyForm({ policy, readOnly }: { policy: PolicyConfig; readOnl
             error={formState.errors.auto_close_business_days?.message}
             disabled={disabled}
           />
-          <div className="flex flex-col gap-1">
-            <span className="label-caps text-muted">SLA mode</span>
-            <Controller
-              control={control}
-              name="sla_mode"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange} disabled={disabled}>
-                  <SelectTrigger aria-label="SLA mode">
-                    <SelectValue placeholder="Mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="calendar">Calendar hours</SelectItem>
-                    <SelectItem value="business">Business hours</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            <p className="text-small text-muted">Business-hours mode is not active yet.</p>
-          </div>
         </fieldset>
 
         <fieldset className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-4" disabled={disabled}>

@@ -1,53 +1,107 @@
 /* Design tokens. Every colour in components must come from these variables. */
+/*
+ * Palette taken from ibotix.ai's own stylesheets:
+ *   brand red #EF4136, dark red #C22920, CTA #DE392E (hover #C92F26), orange #FF8A5B,
+ *   charcoal #151D21, navy #01061A / #1B263A / #0C111A, light text #EEF1FA / #A6ADB8,
+ *   light background #F1F6FF, border #D8DBE0.
+ * Where a site value is below WCAG AA (4.5:1) for small text, the nearest site shade
+ * that passes is used instead (buttons use the site's hover red #C92F26).
+ */
 
 :root,
 [data-theme='light'] {
-  --bg: #f4f5f7;
+  --bg: #f1f6ff;
   --surface: #ffffff;
-  --surface-2: #eceff3;
-  --line: #dadfe7;
-  --fg: #141a25;
-  --muted: #586277;
+  --surface-2: #e9eef7;
+  --line: #d8dbe0;
+  --fg: #151d21;
+  --muted: #4a5156;
 
-  --accent: #0b6e6e;
+  --accent: #c22920;
+  --accent-hover: #a8231b;
   --accent-fg: #ffffff;
-  --accent-soft: #d9eeec;
+  --accent-soft: #fdeceb;
+  --accent-solid: #c92f26;
+  --accent-solid-hover: #b42820;
+  --accent-solid-fg: #ffffff;
 
   --ok: #1b7a4b;
   --ok-soft: #ddf1e6;
   --warn: #8f5b00;
   --warn-soft: #fbebc8;
-  --crit: #b3261e;
-  --crit-soft: #fad9d5;
+  --crit: #a3123a;
+  --crit-soft: #fde7ec;
   --info: #26579b;
   --info-soft: #dce8f7;
 
   --note: #fff6dc;
+
+  /* Charcoal "ink" for the sidebar and brand panels (site footer and cards). */
+  --ink: #151d21;
+  --ink-2: #1b263a;
+  --ink-line: #263038;
+  --ink-fg: #eef1fa;
+  --ink-muted: #a6adb8;
+  --ink-accent: #ef4136;
+
+  /* Sidebar: white in light mode, navy in dark mode. */
+  --side-bg: #ffffff;
+  --side-line: #d8dbe0;
+  --side-fg: #151d21;
+  --side-muted: #4a5156;
+  --side-hover: #f1f6ff;
+  --side-active: #fdeceb;
+  --side-active-fg: #c22920;
+  --side-marker: #ef4136;
+
+  --brand-gradient: linear-gradient(120deg, #c22920 0%, #8e1f2a 34%, #1b263a 70%, #01061a 100%);
+  --brand-strip: linear-gradient(90deg, #c22920 0%, #ef4136 45%, #ff8a5b 100%);
+  --brand-shadow: 0 6px 18px rgba(239, 65, 54, 0.35);
 
   --sidebar-w: 236px;
   --content-max: 1240px;
 }
 
 [data-theme='dark'] {
-  --bg: #0e1218;
-  --surface: #161b24;
-  --surface-2: #1e2430;
-  --line: #2a3140;
-  --fg: #e6e9ef;
-  --muted: #9aa4b6;
+  --bg: #01061a;
+  --surface: #151d21;
+  --surface-2: #1b263a;
+  --line: #263038;
+  --fg: #eef1fa;
+  --muted: #a6adb8;
 
-  --accent: #45bdb6;
-  --accent-fg: #06201f;
-  --accent-soft: #12302f;
+  --accent: #ff6b61;
+  --accent-hover: #ff8a80;
+  --accent-fg: #1a0605;
+  --accent-soft: #2a1518;
+  --accent-solid: #c92f26;
+  --accent-solid-hover: #b42820;
+  --accent-solid-fg: #ffffff;
 
   --ok: #5ccb8e;
   --ok-soft: #14301f;
   --warn: #f0b84a;
   --warn-soft: #332608;
-  --crit: #ff8a80;
-  --crit-soft: #3a1612;
+  --crit: #fb7185;
+  --crit-soft: #3b1220;
   --info: #8db6f0;
   --info-soft: #14263f;
 
   --note: #2e2710;
+
+  --ink: #0c111a;
+  --ink-2: #1b263a;
+  --ink-line: #1f2833;
+  --ink-fg: #eef1fa;
+  --ink-muted: #a6adb8;
+  --ink-accent: #ef4136;
+
+  --side-bg: #0c111a;
+  --side-line: #1f2833;
+  --side-fg: #eef1fa;
+  --side-muted: #a6adb8;
+  --side-hover: #1b263a;
+  --side-active: #1b263a;
+  --side-active-fg: #eef1fa;
+  --side-marker: #ef4136;
 }

@@ -7,6 +7,7 @@ import { describe, expect, it, afterAll, beforeAll, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { db } from '@/mocks/db';
 import { server } from '@/mocks/server';
 import { setAccessToken } from '@/api/client';
 import { AuthProvider, useAuth } from '@/app/providers/AuthProvider';
@@ -15,6 +16,9 @@ import { ASHA, PASSWORD, ROHAN, MFA_CODE } from './msw-session';
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   setAccessToken(null);
+  // The mock's last refresh token stands in for the browser cookie; drop it so the
+  // next mount starts signed out instead of restoring this test's session.
+  db.lastRefreshToken = null;
   cleanupWrapper();
 });
 afterAll(() => server.close());
@@ -67,5 +71,20 @@ describe('AuthProvider (spec 7)', () => {
     });
     expect(result.current.me?.email).toBe(ROHAN);
     expect(result.current.me?.roles).toContain('spoke');
+  });
+
+  it('restores the session from the refresh cookie after a reload', async () => {
+    const first = renderHook(() => useAuth(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(first.result.current.status).toBe('ready'));
+    await act(async () => {
+      await first.result.current.login(ASHA, PASSWORD);
+    });
+    first.unmount();
+
+    // A reload loses the in-memory access token but keeps the cookie.
+    setAccessToken(null);
+    const { result } = renderHook(() => useAuth(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.me?.email).toBe(ASHA);
   });
 });

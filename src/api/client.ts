@@ -70,7 +70,11 @@ async function doRefresh(): Promise<string | null> {
   }
 }
 
-function refreshAccessToken(): Promise<string | null> {
+/**
+ * Single-flight: concurrent callers share one /auth/refresh call. The server rotates the
+ * refresh cookie and revokes the whole session if an already-used one is presented again.
+ */
+export function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = doRefresh().finally(() => {
       refreshPromise = null;

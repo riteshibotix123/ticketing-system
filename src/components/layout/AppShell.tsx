@@ -57,6 +57,7 @@ export function AppShell() {
     <div className="flex min-h-dvh flex-col nav:flex-row">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
+        <div className="brand-strip h-[3px] w-full" aria-hidden="true" />
         <Topbar />
         <OfflineBanner online={online} />
         <main className="safe-pb w-full max-w-[1240px] flex-1 px-4 py-5 nav:px-6">

@@ -145,15 +145,6 @@ export const router = createBrowserRouter([
                   },
                 ],
               },
-              {
-                element: <RequirePermission flag="reports.view_org" />,
-                children: [
-                  {
-                    path: '/reports',
-                    lazy: lazyPage(() => import('@/features/reports/pages/ReportsPage')),
-                  },
-                ],
-              },
             ],
           },
         ],

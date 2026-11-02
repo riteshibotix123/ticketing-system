@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { errorMessage, isApiError } from '@/api/client';
+import { authApi } from '@/api/endpoints/auth';
 import { departmentsApi } from '@/api/endpoints/departments';
 import { ticketsApi, type CreateTicketPayload } from '@/api/endpoints/tickets';
 import { queryKeys } from '@/api/queryKeys';
@@ -38,13 +39,14 @@ export function CreateTicketForm() {
     queryFn: () => departmentsApi.list(),
   });
   const departments = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
-  // Fallback 24 only if the policy call itself fails (spec 11.2 default).
-  const policyQuery = useQuery({
-    queryKey: queryKeys.policy,
-    queryFn: () => departmentsApi.policy(),
+  // Public config, not /policy: every requester may create, but only admins may read policy.
+  // Fallback 24 only if the call itself fails (spec 11.2 default).
+  const configQuery = useQuery({
+    queryKey: queryKeys.publicConfig,
+    queryFn: () => authApi.publicConfig(),
     retry: false,
   });
-  const responseHours = policyQuery.data?.initial_response_hours ?? 24;
+  const responseHours = configQuery.data?.first_response_hours ?? 24;
 
   const draft = useMemo(() => readDraft(), []);
   const {

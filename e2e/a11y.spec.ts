@@ -14,7 +14,6 @@ const ROUTES: { link: string | RegExp; heading: string | RegExp }[] = [
   { link: 'Users', heading: 'Users' },
   { link: 'Configuration', heading: 'Departments' },
   { link: 'Audit log', heading: /audit/i },
-  { link: 'Reports', heading: 'Reports' },
 ];
 
 async function sweep(page: import('@playwright/test').Page) {

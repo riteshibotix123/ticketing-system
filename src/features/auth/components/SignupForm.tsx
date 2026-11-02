@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { SelectItem } from '@/components/ui/select';
 import { FormField } from '@/components/common/FormField';
 import { authApi, type SignupPayload } from '@/api/endpoints/auth';
-import { departmentsApi } from '@/api/endpoints/departments';
 import { queryKeys } from '@/api/queryKeys';
 import { errorMessage, isApiError } from '@/api/client';
 import { MIN_PASSWORD_LENGTH } from '@/lib/constants';
@@ -29,9 +28,11 @@ const SIGNUP_FIELDS = [
 /** Self-signup form (spec 9.1 + 1.3). On success the parent shows the notice. */
 export function SignupForm({ onSuccess }: { onSuccess: (email: string) => void }) {
   const [formError, setFormError] = useState<string | null>(null);
+  // Public config: /departments needs a session, and signup happens before one exists.
   const departments = useQuery({
-    queryKey: queryKeys.departments,
-    queryFn: () => departmentsApi.list(),
+    queryKey: queryKeys.publicConfig,
+    queryFn: () => authApi.publicConfig(),
+    select: (config) => config.departments,
   });
   const signup = useMutation({ mutationFn: (payload: SignupPayload) => authApi.signup(payload) });
   const { register, control, handleSubmit, setError, watch, formState } = useForm<SignupInput>({
@@ -45,11 +46,8 @@ export function SignupForm({ onSuccess }: { onSuccess: (email: string) => void }
     },
   });
 
-  // Only active departments are pickable at signup (spec 1.3/9.1).
-  const activeDepartments = useMemo(
-    () => (departments.data ?? []).filter((d) => d.active),
-    [departments.data],
-  );
+  // Only active departments are pickable at signup (spec 1.3/9.1); the server lists only those.
+  const activeDepartments = useMemo(() => departments.data ?? [], [departments.data]);
 
   const onSubmit = handleSubmit((values) => {
     setFormError(null);

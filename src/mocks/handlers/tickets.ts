@@ -86,6 +86,10 @@ const SORTS: Record<string, (a: DbTicket, b: DbTicket) => number> = {
   urgency: byUrgency,
   newest: (a, b) => b.ticket.created_at.localeCompare(a.ticket.created_at),
   oldest: (a, b) => a.ticket.created_at.localeCompare(b.ticket.created_at),
+  created_at: (a, b) => a.ticket.created_at.localeCompare(b.ticket.created_at),
+  '-created_at': (a, b) => b.ticket.created_at.localeCompare(a.ticket.created_at),
+  title: (a, b) => a.ticket.title.localeCompare(b.ticket.title),
+  status: (a, b) => a.ticket.status.localeCompare(b.ticket.status),
 };
 
 /* ---------------------------------------------------------------- create */

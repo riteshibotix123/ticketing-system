@@ -2,7 +2,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from '@/api/endpoints/auth';
 import type { Me } from '@/types/domain';
-import { setAccessToken, setSessionExpiredHandler } from '@/api/client';
+import {
+  getAccessToken,
+  refreshAccessToken,
+  setAccessToken,
+  setSessionExpiredHandler,
+} from '@/api/client';
 import { queryKeys } from '@/api/queryKeys';
 
 export interface AuthResult {
@@ -44,6 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadMe = useCallback(async () => {
     try {
+      // A page reload drops the in-memory access token; the httpOnly refresh cookie
+      // restores it. No cookie (never signed in) → stay anonymous without probing /auth/me.
+      if (!getAccessToken() && !(await refreshAccessToken())) {
+        setMe(null);
+        return;
+      }
       const next = await authApi.me();
       setMe(next);
     } catch {

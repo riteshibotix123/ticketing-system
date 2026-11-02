@@ -159,8 +159,7 @@ export const transferSchema = z
     current_department_id: z.string().optional(),
   })
   .refine(
-    (value) =>
-      !value.current_department_id || value.department_id !== value.current_department_id,
+    (value) => !value.current_department_id || value.department_id !== value.current_department_id,
     { message: 'Pick a different department.', path: ['department_id'] },
   );
 export type TransferInput = z.infer<typeof transferSchema>;
@@ -178,10 +177,14 @@ export const reviseEtaSchema = z
     current_eta: z.string().optional(),
   })
   .refine((value) => isFuture(value.eta), { message: futureMessage, path: ['eta'] })
-  .refine((value) => !value.current_eta || new Date(value.eta).getTime() !== new Date(value.current_eta).getTime(), {
-    message: 'Pick a different ETA.',
-    path: ['eta'],
-  });
+  .refine(
+    (value) =>
+      !value.current_eta || new Date(value.eta).getTime() !== new Date(value.current_eta).getTime(),
+    {
+      message: 'Pick a different ETA.',
+      path: ['eta'],
+    },
+  );
 export type ReviseEtaInput = z.infer<typeof reviseEtaSchema>;
 
 export const askRequesterSchema = z.object({
@@ -310,13 +313,6 @@ export const policyFormSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Must be below the update cadence.',
         path: ['update_warning_hours'],
-      });
-    }
-    if (value.sla_mode !== 'calendar') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Available in a later release.',
-        path: ['sla_mode'],
       });
     }
   });
