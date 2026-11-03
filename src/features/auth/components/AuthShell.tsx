@@ -29,7 +29,7 @@ export function AuthShell({ title, subtitle, children, footer }: AuthShellProps)
         aria-label="About the Ibotix ticketing portal"
       >
         <BrandMark tone="ink" />
-        <div className="hidden max-w-[480px] lg:block">
+        <div className="hidden max-w-[480px] lg:my-auto lg:block">
           <p className="mb-4 text-label-caps uppercase text-ink-fg">Internal helpdesk</p>
           <p className="text-hero text-ink-fg">Support that moves as fast as your team.</p>
           <p className="mt-4 text-[15px] leading-relaxed text-ink-fg">
@@ -45,7 +45,6 @@ export function AuthShell({ title, subtitle, children, footer }: AuthShellProps)
             ))}
           </ul>
         </div>
-        <p className="hidden text-small text-ink-fg lg:block">Internal use only.</p>
       </aside>
 
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-10">

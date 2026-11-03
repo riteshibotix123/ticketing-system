@@ -81,10 +81,11 @@ describe('rules 5–10: required reasons and summaries', () => {
   });
 
   it('6 — hold needs a reason and a review date', () => {
+    const reviewDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
     expect(
-      holdSchema.safeParse({ reason: 'Awaiting parts', review_date: '2026-11-01' }).success,
+      holdSchema.safeParse({ reason: 'Awaiting parts', review_date: reviewDate }).success,
     ).toBe(true);
-    expect(holdSchema.safeParse({ reason: '', review_date: '2026-11-01' }).success).toBe(false);
+    expect(holdSchema.safeParse({ reason: '', review_date: reviewDate }).success).toBe(false);
     expect(holdSchema.safeParse({ reason: 'Awaiting parts', review_date: '' }).success).toBe(false);
   });
 

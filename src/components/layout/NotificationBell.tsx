@@ -11,7 +11,7 @@ import { RelativeTime } from '@/components/common/RelativeTime';
 import { EmptyState } from '@/components/common/States';
 import { useToast } from '@/hooks/useToast';
 
-/** Notification bell: unread count + popover with the latest 8 and "View all". */
+/** Notification bell: unread count + popover with the latest 8, "Mark all read" and "View all". */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -62,6 +62,15 @@ export function NotificationBell() {
     },
   });
 
+  const markAllRead = useMutation({
+    mutationFn: () => notificationsApi.markAllRead(),
+    onError: () => toastError('Could not mark all as read.'),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
+    },
+  });
+
   function openItem(ticketId?: string, id?: string) {
     if (id && !markRead.isPending) markRead.mutate(id);
     setOpen(false);
@@ -91,16 +100,27 @@ export function NotificationBell() {
       <PopoverContent align="end" className="w-[340px] p-2">
         <div className="flex items-center justify-between px-1 pb-2">
           <h2 className="label-caps text-muted">Notifications</h2>
-          <button
-            type="button"
-            className="text-small text-accent underline-offset-4 hover:underline"
-            onClick={() => {
-              setOpen(false);
-              navigate('/notifications');
-            }}
-          >
-            View all
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="text-small text-accent underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
+              onClick={() => markAllRead.mutate()}
+              disabled={unread === 0 || markAllRead.isPending}
+              data-testid="bell-mark-all-read"
+            >
+              Mark all read
+            </button>
+            <button
+              type="button"
+              className="text-small text-accent underline-offset-4 hover:underline"
+              onClick={() => {
+                setOpen(false);
+                navigate('/notifications');
+              }}
+            >
+              View all
+            </button>
+          </div>
         </div>
         {!data || data.items.length === 0 ? (
           <EmptyState title="Nothing new." description="You are all caught up." />

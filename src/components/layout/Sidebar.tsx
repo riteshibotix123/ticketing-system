@@ -120,11 +120,11 @@ export function Sidebar() {
         })}
       </div>
 
-      <div className="hidden px-4 pb-4 nav:block">
-        <p className="text-small text-side-muted">
-          {USE_MOCKS ? 'Demo data. Nothing leaves this page.' : 'Internal use only.'}
-        </p>
-      </div>
+      {USE_MOCKS ? (
+        <div className="hidden px-4 pb-4 nav:block">
+          <p className="text-small text-side-muted">Demo data. Nothing leaves this page.</p>
+        </div>
+      ) : null}
     </nav>
   );
 }
